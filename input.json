@@ -1,0 +1,9 @@
+{
+    "geometry": {
+        "cylinder_radius": 2.0
+    },
+    "plot": {
+        "x_lower_limit": -5.0,
+        "x_upper_limit": 5.0
+    }
+}
