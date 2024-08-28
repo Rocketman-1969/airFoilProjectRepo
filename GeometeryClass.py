@@ -5,11 +5,6 @@ class Geometery:
     """
     A class to represent the geometry of a circle.
 
-    Attributes
-    ----------
-    radius : float
-        The radius of the circle.
-
     Methods
     -------
     circle():
@@ -36,9 +31,9 @@ class Geometery:
         tuple
             A tuple containing the camber line, upper surface, and lower surface as numpy arrays.
         """
-        angles = np.linspace(0, np.pi, 100)
-        upper_surface = np.array([self.radius * np.cos(angles), self.radius * np.sin(angles)])
-        lower_surface = np.array([self.radius * np.cos(angles), -self.radius * np.sin(angles)])
-        camber = np.array([[self.radius, -self.radius], [0, 0]])
+        x_values = np.linspace(-self.radius, self.radius, 10000)
+        upper_surface = np.array([x_values, np.sqrt(self.radius**2 - x_values**2)])
+        lower_surface = np.array([x_values, -np.sqrt(self.radius**2 - x_values**2)])
+        camber = np.array([x_values, np.zeros_like(x_values)])
 
         return camber, upper_surface, lower_surface

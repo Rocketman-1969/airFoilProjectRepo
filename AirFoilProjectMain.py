@@ -63,6 +63,57 @@ class Main:
 		self.geometry = GeometeryClass.Geometery(self.radius)
 		self.camber, self.upper_surface, self.lower_surface = self.geometry.circle()
 
+	def surface_tangent(self, x):
+		
+		y_upper = np.interp(x, self.upper_surface[0], self.upper_surface[1])
+		y_lower = np.interp(x, self.lower_surface[0], self.lower_surface[1])
+
+		idx_upper = np.searchsorted(self.upper_surface[0], x)
+		idx_lower = np.searchsorted(self.lower_surface[0], x)
+		
+		self.upper_surface = np.insert(self.upper_surface, idx_upper, [x, y_upper], axis=1)
+		self.lower_surface = np.insert(self.lower_surface, idx_lower, [x, y_lower], axis=1)
+		
+		dx_upper = self.upper_surface[0][idx_upper + 1] - self.upper_surface[0][idx_upper-1]
+		dy_upper = self.upper_surface[1][idx_upper + 1] - self.upper_surface[1][idx_upper-1]
+
+		dx_lower = self.lower_surface[0][idx_lower + 1] - self.lower_surface[0][idx_lower-1]
+		dy_lower = self.lower_surface[1][idx_lower + 1] - self.lower_surface[1][idx_lower-1]
+
+		tangent_upper = np.array([dx_upper, dy_upper])
+		tangent_lower = np.array([dx_lower, dy_lower])
+		
+		unit_tangent_upper = tangent_upper / np.linalg.norm(tangent_upper)
+		unit_tangent_lower = tangent_lower / np.linalg.norm(tangent_lower)
+
+		return unit_tangent_upper, unit_tangent_lower
+	
+	def surface_normal(self, x):
+		
+		y_upper = np.interp(x, self.upper_surface[0], self.upper_surface[1])
+		y_lower = np.interp(x, self.lower_surface[0], self.lower_surface[1])
+
+		idx_upper = np.searchsorted(self.upper_surface[0], x)
+		idx_lower = np.searchsorted(self.lower_surface[0], x)
+		
+		self.upper_surface = np.insert(self.upper_surface, idx_upper, [x, y_upper], axis=1)
+		self.lower_surface = np.insert(self.lower_surface, idx_lower, [x, y_lower], axis=1)
+		
+		dx_upper = self.upper_surface[0][idx_upper + 1] - self.upper_surface[0][idx_upper-1]
+		dy_upper = self.upper_surface[1][idx_upper + 1] - self.upper_surface[1][idx_upper-1]
+
+		dx_lower = self.lower_surface[0][idx_lower + 1] - self.lower_surface[0][idx_lower-1]
+		dy_lower = self.lower_surface[1][idx_lower + 1] - self.lower_surface[1][idx_lower-1]
+
+		normal_upper = np.array([dy_upper, dx_upper])
+		normal_lower = np.array([-dy_lower, -dx_lower])
+		
+		unit_tangent_upper = normal_upper / np.linalg.norm(normal_upper)
+		unit_tangent_lower = normal_lower / np.linalg.norm(normal_lower)
+
+		return unit_tangent_upper, unit_tangent_lower
+
+		
 	def plot(self):
 		"""
 		Plots the camber line, upper surface, and lower surface.
@@ -82,7 +133,15 @@ class Main:
 		"""
 		self.load_config()
 		self.setup_geometry()
-		self.plot()
+		#self.plot()
+		unit_tangent_upper, unit_tangent_lower = self.surface_tangent(-1.99999)
+		unit_normal_upper, unit_normal_lower = self.surface_normal(0)
+		print(f'Unit tangent vector on the upper surface at x=0: {unit_tangent_upper}')
+		print(f'Unit tangent vector on the lower surface at x=0: {unit_tangent_lower}')
+		print(f'Unit normal vector on the upper surface at x=0: {unit_normal_upper}')
+		print(f'Unit normal vector on the lower surface at x=0: {unit_normal_lower}')
+		
+		
 
 if __name__ == "__main__":
 	main = Main('input.json')
