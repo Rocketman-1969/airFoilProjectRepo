@@ -22,7 +22,7 @@ class Geometery:
         """
         self.radius = radius
 
-    def circle(self):
+    def circle(self,x):
         """
         Calculates the camber line, upper surface, and lower surface of the circle.
 
@@ -31,9 +31,9 @@ class Geometery:
         tuple
             A tuple containing the camber line, upper surface, and lower surface as numpy arrays.
         """
-        x_values = np.linspace(-self.radius, self.radius, 10000)
-        upper_surface = np.array([x_values, np.sqrt(self.radius**2 - x_values**2)])
-        lower_surface = np.array([x_values, -np.sqrt(self.radius**2 - x_values**2)])
-        camber = np.array([x_values, np.zeros_like(x_values)])
+
+        upper_surface = np.array([x, np.sqrt(self.radius**2 - x**2)])
+        lower_surface = np.array([x, -np.sqrt(self.radius**2 - x**2)])
+        camber = np.array([x, 0])
 
         return camber, upper_surface, lower_surface
