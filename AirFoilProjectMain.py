@@ -91,25 +91,21 @@ class Main:
 
         # Interpolate to find the y-coordinate at x
 		if np.abs(x-self.radius) < delta:
-			if x > 0:
-				camber, y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+			_, y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+			tangent_upper = np.array([2 * delta, -1*(y_upper_minus[1]-y_lower_minus[1])])
+			tangent_lower = np.array([2 * delta, -1*(y_upper_minus[1]-y_lower_minus[1])])
+		elif np.abs(x+self.radius) < delta:
+			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
-				tangent_upper = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
-				tangent_lower = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
-
-			if x < 0:
-				camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
-
-				tangent_upper = np.array([2 * delta, y_lower_plus[1]-y_upper_plus[1]])
-				tangent_lower = np.array([2 * delta, y_lower_plus[1]-y_upper_plus[1]])
-
+			tangent_upper = np.array([-2 * delta, y_upper_plus[1]-y_lower_plus[1]])
+			tangent_lower = np.array([-2 * delta, y_upper_plus[1]-y_lower_plus[1]])
 		else:
-			camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
+			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
-			camber,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
 
 			tangent_upper = np.array([2 * delta, y_upper_plus[1] - y_upper_minus[1]])
-			tangent_lower = np.array([2 * delta, y_lower_plus[1] - y_lower_minus[1]])
+			tangent_lower = np.array([-2 * delta, -1*(y_lower_plus[1] - y_lower_minus[1])])
 
 			
 
@@ -135,30 +131,31 @@ class Main:
 
         # Interpolate to find the y-coordinate at x
 		if np.abs(x-self.radius) < delta:
-			if x > 0:
-				camber,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+			camber,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+			tangent_upper = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
+			tangent_lower = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
 
-				tangent_upper = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
-				tangent_lower = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
+			normal_upper = np.array([tangent_upper[1], tangent_upper[0]])
+			normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])		
+		elif np.abs(x+self.radius) < delta:
+			camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
-				
-			if x < 0:
-				camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
+			tangent_upper = np.array([-2 * delta, y_upper_plus[1]-y_lower_plus[1]])
+			tangent_lower = np.array([-2 * delta, y_upper_plus[1]-y_lower_plus[1]])
 
-				tangent_upper = np.array([2 * delta, y_lower_plus[1]-y_upper_plus[1]])
-				tangent_lower = np.array([2 * delta, y_lower_plus[1]-y_upper_plus[1]])
-
+			normal_upper = np.array([-tangent_upper[1], tangent_upper[0]])
+			normal_lower = np.array([-tangent_lower[1], -tangent_lower[0]]) 
 		else:
 			camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
 			camber,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
 
 			tangent_upper = np.array([2 * delta, y_upper_plus[1] - y_upper_minus[1]])
-			tangent_lower = np.array([2 * delta, y_lower_plus[1] - y_lower_minus[1]])
+			tangent_lower = np.array([2 * delta, (y_lower_plus[1] - y_lower_minus[1])])
 
 
-		normal_upper = np.array([tangent_upper[1], -tangent_upper[0]])
-		normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])
+			normal_upper = np.array([-tangent_upper[1], tangent_upper[0]])
+			normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])
 
 		unit_normal_upper = normal_upper / np.linalg.norm(normal_upper)	
 		unit_normal_lower = normal_lower / np.linalg.norm(normal_lower)
@@ -224,41 +221,36 @@ class Main:
 			upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
 			lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
 
-		tangent_upper, tangent_lower = self.surface_tangent(2)
-		normal_upper, normal_lower = self.surface_normal(2)
+
+		x_coord = 2
+		_,point,_ = self.geometry.circle(x_coord)
+		y_coord = point[1]
+		tangent_upper, tangent_lower = self.surface_tangent(x_coord)
+		normal_upper, normal_lower = self.surface_normal(x_coord)
+
+		
 
 		print("tangent_upper: ", tangent_upper)
 		print("tangent_lower: ", tangent_lower)
 		print("normal_upper: ", normal_upper)
 		print("normal_lower: ", normal_lower)
 
-		
-
-
-
-
-		# # set up X array
-		
-
-		# unit_normal_upper, unit_normal_lower = self.surface_normal(-2)
-		# unit_tangent_upper, unit_tangent_lower = self.surface_tangent(-2)
-
-		# # Print the results
-		# print("normal_upper: ", unit_normal_upper)
-		# print("normal_lower: ", unit_normal_lower)
-		# print("tangent_upper: ", unit_tangent_upper)
-		# print("tangent_lower: ", unit_tangent_lower)
-
 		# Plotting the results
-		# plt.figure()
-		# plt.plot(camber[0, :], camber[1, :], label='Camber')
-		# plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface')
-		# plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface')
-		# plt.legend(loc='upper right')
-		# plt.xlabel('X')
-		# plt.ylabel('Y')
-		# plt.title('Airfoil Geometry')
-		# plt.show()
+		plt.figure()
+		plt.plot(camber[0, :], camber[1, :], label='Camber')
+		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface')
+		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface')
+		# Plot tangent and normal vectors
+
+		plt.quiver(x_coord, y_coord, tangent_upper[0], tangent_upper[1], color='green', scale=10, label='Tangent Upper')
+		plt.quiver(x_coord, y_coord, normal_upper[0], normal_upper[1], color='purple', scale=10, label='Normal Upper')
+		plt.quiver(x_coord, -y_coord, tangent_lower[0], tangent_lower[1], color='red', scale=10, label='Tangent Lower')
+		plt.quiver(x_coord, -y_coord, normal_lower[0], normal_lower[1], color='yellow', scale=10, label='Normal Lower')
+		plt.legend(loc='upper right')
+		plt.xlabel('X')
+		plt.ylabel('Y')
+		plt.title('Airfoil Geometry')
+		plt.show()
 
 if __name__ == "__main__":
 	main = Main('input.json')
