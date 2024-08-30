@@ -74,50 +74,96 @@ class Main:
 		V_inf (float): The free stream velocity.
 		alpha (float): The angle of attack.
 		"""
-		self.flow = Flow.Flow(self.radius, V_inf, alpha)
+		self.flow = Flow.Flow(self.radius, V_inf, alpha, self.x_low_val, self.x_up_val)
+
+	def surface_tangent(self, x):
+		"""
+        Calculate the surface normal vectors at a given x-coordinate.
+
+        Parameters:
+        surface (np.ndarray): A 2xN array where the first row contains x-coordinates and the second row contains y-coordinates.
+        x (float): The x-coordinate at which to calculate the surface normals.
+
+        Returns:
+        tuple: A tuple containing the unit normal vectors for the upper and lower surfaces.
+        """
+		delta = 1e-5  # Small perturbation for numerical differentiation
+
+        # Interpolate to find the y-coordinate at x
+		if np.abs(x-self.radius) < delta:
+			if x > 0:
+				camber, y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+
+				tangent_upper = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
+				tangent_lower = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
+
+			if x < 0:
+				camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
+
+				tangent_upper = np.array([2 * delta, y_lower_plus[1]-y_upper_plus[1]])
+				tangent_lower = np.array([2 * delta, y_lower_plus[1]-y_upper_plus[1]])
+
+		else:
+			camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
+
+			camber,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+
+			tangent_upper = np.array([2 * delta, y_upper_plus[1] - y_upper_minus[1]])
+			tangent_lower = np.array([2 * delta, y_lower_plus[1] - y_lower_minus[1]])
+
+			
+
+
+		unit_tangent_upper = tangent_upper / np.linalg.norm(tangent_upper)	
+		unit_tangent_lower = tangent_lower / np.linalg.norm(tangent_lower)	
+
+
+		return unit_tangent_upper, unit_tangent_lower
 
 	def surface_normal(self, x):
-		"""
-		Calculate the surface normal vectors at a given x-coordinate.
+		"""""
+        Calculate the surface tangent vectors at a given x-coordinate.
 
-		Parameters:
-		x (float): The x-coordinate at which to calculate the surface normals.
+        Parameters:
+        surface (np.ndarray): A 2xN array where the first row contains x-coordinates and the second row contains y-coordinates.
+        x (float): The x-coordinate at which to calculate the surface tangents.
 
-		Returns:
-		tuple: A tuple containing the unit normal vectors for the upper and lower surfaces.
-		"""
-		normal_upper = np.array([x, np.sqrt(self.radius**2 - x**2)])
-		normal_lower = np.array([x, np.sqrt(self.radius**2 - x**2)])
+        Returns:
+        np.ndarray: The unit tangent vector at the given x-coordinate.
+        """
+		delta = 1e-5  # Small perturbation for numerical differentiation
 
-		unit_normal_upper = normal_upper / np.linalg.norm(normal_upper)
+        # Interpolate to find the y-coordinate at x
+		if np.abs(x-self.radius) < delta:
+			if x > 0:
+				camber,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+
+				tangent_upper = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
+				tangent_lower = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
+
+				
+			if x < 0:
+				camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
+
+				tangent_upper = np.array([2 * delta, y_lower_plus[1]-y_upper_plus[1]])
+				tangent_lower = np.array([2 * delta, y_lower_plus[1]-y_upper_plus[1]])
+
+		else:
+			camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
+
+			camber,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+
+			tangent_upper = np.array([2 * delta, y_upper_plus[1] - y_upper_minus[1]])
+			tangent_lower = np.array([2 * delta, y_lower_plus[1] - y_lower_minus[1]])
+
+
+		normal_upper = np.array([tangent_upper[1], -tangent_upper[0]])
+		normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])
+
+		unit_normal_upper = normal_upper / np.linalg.norm(normal_upper)	
 		unit_normal_lower = normal_lower / np.linalg.norm(normal_lower)
 
 		return unit_normal_upper, unit_normal_lower
-	
-	def surface_tangent(self, x):
-		"""
-		Calculate the surface tangent vectors at a given x-coordinate.
-
-		Parameters:
-		x (float): The x-coordinate at which to calculate the surface tangents.
-
-		Returns:
-		tuple: A tuple containing the unit tangent vectors for the upper and lower surfaces.
-		"""
-		unit_tangent_upper, unit_tangent_lower = self.surface_normal(x)
-
-		z = np.array([0, 0, 1])
-
-		tangent_upper = np.cross(unit_tangent_upper, z)
-		tangent_lower = np.cross(-unit_tangent_lower, z)
-
-		unit_tangent_upper = tangent_upper / np.linalg.norm(tangent_upper)
-		unit_tangent_lower = tangent_lower / np.linalg.norm(tangent_lower)
-
-		unit_tangent_lower = unit_tangent_lower[:2]
-		unit_tangent_upper = unit_tangent_upper[:2]
-
-		return unit_tangent_upper, unit_tangent_lower
 	
 	def surface_tangential_velocity(self, x):
 		"""
@@ -136,6 +182,26 @@ class Main:
 
 		return velocity_upper, velocity_lower
 
+	def rk4(self, f, x, y, h):
+		"""
+		Perform a single step of the Runge-Kutta 4th order method.
+
+		Parameters:
+		f (function): The function to evaluate.
+		x (float): The x-coordinate.
+		y (float): The y-coordinate.
+		h (float): The step size.
+
+		Returns:
+		float: The new y-coordinate.
+		"""
+		k1 = h * f(x, y)
+		k2 = h * f(x + h / 2, y + k1 / 2)
+		k3 = h * f(x + h / 2, y + k2 / 2)
+		k4 = h * f(x + h, y + k3)
+
+		return y + (k1 + 2 * k2 + 2 * k3 + k4) / 6
+
 	
 	def run(self):
 		"""
@@ -145,29 +211,34 @@ class Main:
 		self.setup_Geometry()
 		self.load_flow_field(1, 0)
 
-		Velocity = self.flow.flow_over_cylinder_cartesin(4, 0)
-		print(Velocity)
+		x = np.linspace(-1 * self.radius, self.radius, 1000)
+		camber = np.empty((2, 0))
+		upper_surface = np.empty((2, 0))
+		lower_surface = np.empty((2, 0))
 
-		velocity_upper, velocity_lower = self.surface_tangential_velocity(1)
-		print("Velocity Upper: ", velocity_upper)
-		print("Velocity Lower: ", velocity_lower)
+		for i in range(len(x)):
+			camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.circle(x[i])
+
+			# Append the new values to the arrays
+			camber = np.hstack((camber, camber_temp.reshape(2, 1)))
+			upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
+			lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
+
+		tangent_upper, tangent_lower = self.surface_tangent(2)
+		normal_upper, normal_lower = self.surface_normal(2)
+
+		print("tangent_upper: ", tangent_upper)
+		print("tangent_lower: ", tangent_lower)
+		print("normal_upper: ", normal_upper)
+		print("normal_lower: ", normal_lower)
+
+		
 
 
 
 
 		# # set up X array
-		# x = np.linspace(-1 * self.radius, self.radius, 1000)
-		# camber = np.empty((2, 0))
-		# upper_surface = np.empty((2, 0))
-		# lower_surface = np.empty((2, 0))
-
-		# for i in range(len(x)):
-		# 	camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.circle(x[i])
-
-		# 	# Append the new values to the arrays
-		# 	camber = np.hstack((camber, camber_temp.reshape(2, 1)))
-		# 	upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
-		# 	lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
+		
 
 		# unit_normal_upper, unit_normal_lower = self.surface_normal(-2)
 		# unit_tangent_upper, unit_tangent_lower = self.surface_tangent(-2)
