@@ -76,7 +76,6 @@ class Flow:
             x = x_new
             y = y_new
 
-            print(x_new, y_new)
             if x_new < self.x_low_val or x_new > self.x_up_val:
                 break
 
