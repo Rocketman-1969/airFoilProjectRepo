@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import json
 import GeometeryClass
 import Flow
+from scipy.optimize import newton
 
 
 class Main:
@@ -57,8 +58,17 @@ class Main:
 		with open(self.config_file, 'r') as file:
 			json_vals = json.load(file)
 		self.radius = json_vals['geometry']['cylinder_radius']
+		self.LE = json_vals['geometry']['leading_edge_x']
+		self.TE = json_vals['geometry']['trailing_edge_x']
+		self.x_start = json_vals['plot']['x_start']
 		self.x_low_val = json_vals['plot']['x_lower_limit']
 		self.x_up_val = json_vals['plot']['x_upper_limit']
+		self.delta_s = json_vals['plot']['delta_s']
+		self.n_lines = json_vals['plot']['n_lines']
+		self.delta_y = json_vals['plot']['delta_y']
+		self.free_stream_velocity = json_vals['operating']['u_inf']
+		self.angle_of_attack = json_vals['operating']['alpha']
+
 
 	def setup_Geometry(self):
 		"""
@@ -131,14 +141,14 @@ class Main:
 
         # Interpolate to find the y-coordinate at x
 		if np.abs(x-self.radius) < delta:
-			camber,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
 			tangent_upper = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
 			tangent_lower = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
 
 			normal_upper = np.array([tangent_upper[1], tangent_upper[0]])
 			normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])		
 		elif np.abs(x+self.radius) < delta:
-			camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
+			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
 			tangent_upper = np.array([-2 * delta, y_upper_plus[1]-y_lower_plus[1]])
 			tangent_lower = np.array([-2 * delta, y_upper_plus[1]-y_lower_plus[1]])
@@ -146,9 +156,9 @@ class Main:
 			normal_upper = np.array([-tangent_upper[1], tangent_upper[0]])
 			normal_lower = np.array([-tangent_lower[1], -tangent_lower[0]]) 
 		else:
-			camber,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
+			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
-			camber,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
 
 			tangent_upper = np.array([2 * delta, y_upper_plus[1] - y_upper_minus[1]])
 			tangent_lower = np.array([2 * delta, (y_lower_plus[1] - y_lower_minus[1])])
@@ -162,7 +172,7 @@ class Main:
 
 		return unit_normal_upper, unit_normal_lower
 	
-	def surface_tangential_velocity(self, x):
+	def surface_tangential_velocity(self, x, upper=True):
 		"""
 		Calculate the tangential velocity at a given x-coordinate.
 
@@ -174,40 +184,108 @@ class Main:
 		"""
 		unit_tangent_upper, unit_tangent_lower = self.surface_tangent(x)
 
-		velocity_upper = np.dot(self.flow.flow_over_cylinder_cartesin(x, np.sqrt(self.radius**2 - x**2)), unit_tangent_upper)
-		velocity_lower = np.dot(self.flow.flow_over_cylinder_cartesin(x, -np.sqrt(self.radius**2 - x**2)), unit_tangent_lower)
+		if upper:
+			velocity_upper = np.dot(self.flow.flow_over_cylinder_cartesin(x, np.sqrt(self.radius**2 - x**2)), unit_tangent_upper)
+			return velocity_upper
+		else:
+			velocity_lower = np.dot(self.flow.flow_over_cylinder_cartesin(x, -np.sqrt(self.radius**2 - x**2)), unit_tangent_lower)
+			return velocity_lower
 
-		return velocity_upper, velocity_lower
-
-	def rk4(self, f, x, y, h):
+	def velocity_derivative(self, x, upper=True):
 		"""
-		Perform a single step of the Runge-Kutta 4th order method.
+		Calculate the derivative of the velocity at a given x-coordinate.
 
 		Parameters:
-		f (function): The function to evaluate.
-		x (float): The x-coordinate.
-		y (float): The y-coordinate.
-		h (float): The step size.
+		x (float): The x-coordinate at which to calculate the velocity derivative.
 
 		Returns:
-		float: The new y-coordinate.
+		tuple: A tuple containing the velocity derivative for the upper and lower surfaces.
 		"""
-		k1 = h * f(x, y)
-		k2 = h * f(x + h / 2, y + k1 / 2)
-		k3 = h * f(x + h / 2, y + k2 / 2)
-		k4 = h * f(x + h, y + k3)
-
-		return y + (k1 + 2 * k2 + 2 * k3 + k4) / 6
+		delta = 1e-5
+		if upper:
+			velocity_upper_plus = self.surface_tangential_velocity(x + delta, upper=True)
+			velocity_upper_minus = self.surface_tangential_velocity(x - delta, upper=True)
+			velocity_derivative_upper = (velocity_upper_plus - velocity_upper_minus) / (2 * delta)
+			return velocity_derivative_upper
+		else:
+			velocity_lower_plus = self.surface_tangential_velocity(x + delta, upper=False)
+			velocity_lower_minus = self.surface_tangential_velocity(x - delta, upper=False)
+			velocity_derivative_lower = (velocity_lower_plus - velocity_lower_minus) / (2 * delta)
+			return velocity_derivative_lower
 
 	
-	def run(self):
+	def stagnation_point(self):
 		"""
-		Executes the main logic of the application.
-		"""
-		self.load_config()
-		self.setup_Geometry()
-		self.load_flow_field(1, 0)
+        Calculate the stagnation point of the flow field.
 
+        Returns:
+        tuple: A tuple containing the x and y coordinates of the forward and aft stagnation points.
+        """
+		epsilon = 1e-5  # Small perturbation for numerical differentiation
+
+        # Check leading edge (LE) and trailing edge (TE)
+		velocity_LE = self.surface_tangential_velocity(self.LE)
+		velocity_TE = self.surface_tangential_velocity(self.TE)
+
+		if np.abs(velocity_LE) < epsilon:
+			forward_stagnation_point = [self.LE, 0]
+		else:
+			if velocity_LE < 0:
+                # Use upper surface
+				upper_flag = True
+				def velocity_function(x):
+					return self.surface_tangential_velocity(x, upper=upper_flag)
+				def velocity_prime(x):
+					return self.velocity_derivative(x, upper=upper_flag)
+				x_stag = newton(velocity_function, self.LE + 0.01, fprime=velocity_prime, tol=epsilon)
+				_, forward_stagnation_point, _ = self.geometry.circle(x_stag)
+			else:
+                # Use lower surface
+				upper_flag = False
+				def velocity_function(x):
+					return self.surface_tangential_velocity(x, upper=upper_flag)
+				def velocity_prime(x):
+					return self.velocity_derivative(x, upper=upper_flag)
+				x_stag = newton(velocity_function, self.LE + 0.01, fprime=velocity_prime, tol=epsilon)
+				_, _, forward_stagnation_point = self.geometry.circle(x_stag)
+
+		if np.abs(velocity_TE) < epsilon:
+			aft_stagnation_point = [self.TE, 0]
+		else:
+			if velocity_LE < 0:
+                # Use lower surface
+				upper_flag = False
+				def velocity_function(x):
+					return self.surface_tangential_velocity(x, upper=upper_flag)
+				def velocity_prime(x):
+					return self.velocity_derivative(x, upper=upper_flag)
+				x_stag = newton(velocity_function, self.TE - 0.01, fprime=velocity_prime, tol=epsilon)
+				_, _, aft_stagnation_point = self.geometry.circle(x_stag)
+			else:
+                # Use upper surface
+				upper_flag = True
+				def velocity_function(x):
+					return self.surface_tangential_velocity(x, upper=upper_flag)
+				def velocity_prime(x):
+					return self.velocity_derivative(x, upper=upper_flag)
+				x_stag = newton(velocity_function, self.TE - 0.01, fprime=velocity_prime, tol=epsilon)
+				_, aft_stagnation_point, _ = self.geometry.circle(x_stag)
+
+		return forward_stagnation_point, aft_stagnation_point
+
+	
+	def plot(self, x_start, x_lower_limit, x_upper_limit, delta_s, n_lines, delta_y):
+		"""
+		Plot the streamlines for the flow field.
+
+		Parameters:
+		x_start (float): The x-coordinate at which to start the streamlines.
+		x_lower_limit (float): The lower limit for the x-axis.
+		x_upper_limit (float): The upper limit for the x-axis.
+		delta_s (float): The step size for the streamlines.
+		n_lines (int): The number of streamlines to plot.
+		delta_y (float): The spacing between streamlines.
+		"""
 		x = np.linspace(-1 * self.radius, self.radius, 1000)
 		camber = np.empty((2, 0))
 		upper_surface = np.empty((2, 0))
@@ -221,36 +299,101 @@ class Main:
 			upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
 			lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
 
-
-		x_coord = 2
-		_,point,_ = self.geometry.circle(x_coord)
-		y_coord = point[1]
-		tangent_upper, tangent_lower = self.surface_tangent(x_coord)
-		normal_upper, normal_lower = self.surface_normal(x_coord)
-
+		#calculate stagnation points
+		forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
 		
-
-		print("tangent_upper: ", tangent_upper)
-		print("tangent_lower: ", tangent_lower)
-		print("normal_upper: ", normal_upper)
-		print("normal_lower: ", normal_lower)
-
-		# Plotting the results
+		# Set up the plot
 		plt.figure()
 		plt.plot(camber[0, :], camber[1, :], label='Camber')
-		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface')
-		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface')
-		# Plot tangent and normal vectors
-
-		plt.quiver(x_coord, y_coord, tangent_upper[0], tangent_upper[1], color='green', scale=10, label='Tangent Upper')
-		plt.quiver(x_coord, y_coord, normal_upper[0], normal_upper[1], color='purple', scale=10, label='Normal Upper')
-		plt.quiver(x_coord, -y_coord, tangent_lower[0], tangent_lower[1], color='red', scale=10, label='Tangent Lower')
-		plt.quiver(x_coord, -y_coord, normal_lower[0], normal_lower[1], color='yellow', scale=10, label='Normal Lower')
-		plt.legend(loc='upper right')
+		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface', color='red')
+		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface',color='red')
 		plt.xlabel('X')
 		plt.ylabel('Y')
 		plt.title('Airfoil Geometry')
+		# Calculate the streamlines
+		for i in range(n_lines):
+			x = x_start
+			y = -delta_y * i
+			streamline = self.flow.streamlines(x, y, delta_s)
+			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
+			y = delta_y * i
+			streamline = self.flow.streamlines(x, y, delta_s)
+			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
+		plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
+		plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
+		#forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0], forward_stagnation_point[1], -1*delta_s)
+		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0], aft_stagnation_point[1], delta_s)
+		#plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='green')
+		plt.plot(aft_stag_streamline[:, 0], aft_stag_streamline[:, 1],color='green')
+		plt.xlim(x_lower_limit, x_upper_limit)
+		plt.ylim(x_lower_limit, x_upper_limit)
+		plt.gca().set_aspect('equal', adjustable='box')
 		plt.show()
+
+
+	def run(self):
+		"""
+		Executes the main logic of the application.
+		"""
+		self.load_config()
+		self.setup_Geometry()
+		self.load_flow_field(self.free_stream_velocity, self.angle_of_attack)
+
+		self.plot(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
+
+		# streamlines_upper = self.flow.streamlines(-4.5,-.25,0.01)
+
+		# plt.plot(streamlines_upper[:,0], streamlines_upper[:,1],label='Streamlines Upper')
+		# plt.show()
+		# forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
+		# print("Forward Stagnation Point: ", forward_stagnation_point)
+		# print("Aft Stagnation Point: ", aft_stagnation_point)
+
+		
+
+		# x = np.linspace(-1 * self.radius, self.radius, 1000)
+		# camber = np.empty((2, 0))
+		# upper_surface = np.empty((2, 0))
+		# lower_surface = np.empty((2, 0))
+
+		# for i in range(len(x)):
+		# 	camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.circle(x[i])
+
+		# 	# Append the new values to the arrays
+		# 	camber = np.hstack((camber, camber_temp.reshape(2, 1)))
+		# 	upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
+		# 	lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
+
+
+		# x_coord = 2
+		# _,point,_ = self.geometry.circle(x_coord)
+		# y_coord = point[1]
+		# tangent_upper, tangent_lower = self.surface_tangent(x_coord)
+		# normal_upper, normal_lower = self.surface_normal(x_coord)
+
+		
+
+		# print("tangent_upper: ", tangent_upper)
+		# print("tangent_lower: ", tangent_lower)
+		# print("normal_upper: ", normal_upper)
+		# print("normal_lower: ", normal_lower)
+
+		# # Plotting the results
+		# plt.figure()
+		# plt.plot(camber[0, :], camber[1, :], label='Camber')
+		# plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface')
+		# plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface')
+		# # Plot tangent and normal vectors
+
+		# plt.quiver(x_coord, y_coord, tangent_upper[0], tangent_upper[1], color='green', scale=10, label='Tangent Upper')
+		# plt.quiver(x_coord, y_coord, normal_upper[0], normal_upper[1], color='purple', scale=10, label='Normal Upper')
+		# plt.quiver(x_coord, -y_coord, tangent_lower[0], tangent_lower[1], color='red', scale=10, label='Tangent Lower')
+		# plt.quiver(x_coord, -y_coord, normal_lower[0], normal_lower[1], color='yellow', scale=10, label='Normal Lower')
+		# plt.legend(loc='upper right')
+		# plt.xlabel('X')
+		# plt.ylabel('Y')
+		# plt.title('Airfoil Geometry')
+		# plt.show()
 
 if __name__ == "__main__":
 	main = Main('input.json')

@@ -1,9 +1,20 @@
 {
     "geometry": {
-        "cylinder_radius": 2.0
+        "cylinder_radius": 2.0,
+        "leading_edge_x": -2.0,
+        "trailing_edge_x": 2.0
+    },
+    "operating": {
+        "u_inf": 10.0,
+        "alpha": 15.0
     },
     "plot": {
+        "x_start": -5.0,
         "x_lower_limit": -5.0,
-        "x_upper_limit": 5.0
+        "x_upper_limit": 5.0,
+        "delta_s": 0.01,
+        "n_lines": 20,
+        "delta_y": 0.3
+
     }
 }

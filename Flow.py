@@ -20,13 +20,21 @@ class Flow:
             A tuple containing the camber line, upper surface, and lower surface as numpy arrays.
         """
         r = np.sqrt(x**2 + y**2)
-        costheta = x / r
-        sintheta = y / r
+        theta = np.arctan2(y, x)
 
-        f_1 = self.V_inf * (1 - (self.radius**2 / r**2))*((costheta)*np.cos(self.alpha) + (sintheta)*np.sin(self.alpha))
-        f_2 = -self.V_inf * (1 + (self.radius**2 / r**2))*((sintheta)*np.cos(self.alpha) - (costheta)*np.cos(self.alpha))
+        alpha = np.deg2rad(self.alpha)
+        
+        r_dot = self.V_inf * (1 - (self.radius**2 / r**2))*np.cos(theta - alpha)
+        theta_dot = -self.V_inf * (1 + (self.radius**2 / r**2))*np.sin(theta - alpha)
 
-        velocity = np.array([f_1*(costheta) - f_2*(sintheta), f_1*(sintheta) + f_2*(costheta)])
+        x_dot = r_dot * np.cos(theta) - theta_dot * np.sin(theta)
+        y_dot = r_dot * np.sin(theta) + theta_dot * np.cos(theta)
+        velocity = np.array([x_dot, y_dot])
+
+        # f_1 = self.V_inf * (1 - (self.radius**2 / r**2))*((costheta)*np.cos(self.alpha) + (sintheta)*np.sin(self.alpha))
+        # f_2 = -self.V_inf * (1 + (self.radius**2 / r**2))*((sintheta)*np.cos(self.alpha) - (costheta)*np.cos(self.alpha))
+
+        # velocity = np.array([f_1*(costheta) - f_2*(sintheta), f_1*(sintheta) + f_2*(costheta)])
 
         # f_1 = self.V_inf * (1 - (self.radius**2 / (x**2 + y**2)))*((x / np.sqrt(x**2 + y**2))*np.cos(self.alpha) + (y / np.sqrt(x**2 + y**2))*np.sin(self.alpha))
         # f_2 = self.V_inf * (1 + (self.radius**2 / (x**2 + y**2)))*((y / np.sqrt(x**2 + y**2))*np.cos(self.alpha) - (y / np.sqrt(x**2 + y**2))*np.cos(self.alpha))
@@ -41,7 +49,7 @@ class Flow:
 
         return velocity
     
-    def streamlines(self, x,y, delta_s):
+    def streamlines(self, x, y, delta_s):
         """
         Calculate the streamlines at a given x-coordinate.
     
@@ -73,4 +81,4 @@ class Flow:
                 break
 
             
-        return streamline
+        return np.array(streamline)
