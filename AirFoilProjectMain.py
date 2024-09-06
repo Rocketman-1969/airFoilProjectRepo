@@ -303,7 +303,17 @@ class Main:
 
 		#calculate stagnation points
 		forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
-		
+		forward_normal_stag_up, forward_normal_stag_down = self.surface_normal(forward_stagnation_point[0])
+		aft_normal_stag_up, aft_normal_stag_down = self.surface_normal(aft_stagnation_point[0])
+		if forward_stagnation_point[1] < 0:
+			forward_normal_stag = forward_normal_stag_down
+		else:
+			forward_normal_stag = forward_normal_stag_up
+		if aft_stagnation_point[1] < 0:
+			aft_normal_stag = aft_normal_stag_down
+		else:
+			aft_normal_stag = aft_normal_stag_up
+
 		# Set up the plot
 		plt.figure()
 		plt.plot(camber[0, :], camber[1, :], label='Camber')
@@ -313,21 +323,23 @@ class Main:
 		plt.ylabel('Y')
 		plt.title('Airfoil Geometry')
 		# Calculate the streamlines
+		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]+forward_normal_stag[0] * 1e-3, forward_stagnation_point[1]+forward_normal_stag[1] * 1e-3, -1*delta_s)
+		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]+aft_normal_stag[0] * 1e-3, aft_stagnation_point[1] + aft_normal_stag[1]*1e-3, delta_s)
+		plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='blue')
+		plt.plot(aft_stag_streamline[:, 0], aft_stag_streamline[:, 1],color='blue')
+
 		for i in range(n_lines):
 			x = x_start
-			y = -delta_y * i
+			y = -delta_y * (i+1) + forward_stag_streamline[-1,1]
 			streamline = self.flow.streamlines(x, y, delta_s)
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
-			y = delta_y * i
+			y = delta_y * (i+1) + forward_stag_streamline[-1,1]
 			streamline = self.flow.streamlines(x, y, delta_s)
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
 		plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
 		plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
 
-		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]-1e-5, forward_stagnation_point[1], -1*delta_s)
-		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]+1e-5, aft_stagnation_point[1], delta_s)
-		plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='black')
-		plt.plot(aft_stag_streamline[:, 0], aft_stag_streamline[:, 1],color='black')
+
 		plt.xlim(x_lower_limit, x_upper_limit)
 		plt.ylim(x_lower_limit, x_upper_limit)
 		plt.gca().set_aspect('equal', adjustable='box')

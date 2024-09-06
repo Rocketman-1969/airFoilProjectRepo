@@ -6,14 +6,14 @@
     },
     "operating": {
         "u_inf": 10.0,
-        "alpha": 45
+        "alpha": 15
     },
     "plot": {
         "x_start": -5.0,
         "x_lower_limit": -5.0,
         "x_upper_limit": 5.0,
         "delta_s": 0.01,
-        "n_lines": 30,
+        "n_lines": 20,
         "delta_y": 0.3
 
     }
