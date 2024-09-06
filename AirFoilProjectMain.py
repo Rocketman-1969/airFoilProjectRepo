@@ -102,20 +102,20 @@ class Main:
         # Interpolate to find the y-coordinate at x
 		if np.abs(x-self.radius) < delta:
 			_, y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
-			tangent_upper = np.array([2 * delta, -1*(y_upper_minus[1]-y_lower_minus[1])])
-			tangent_lower = np.array([2 * delta, -1*(y_upper_minus[1]-y_lower_minus[1])])
+			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), -1*(y_upper_minus[1]-y_lower_minus[1])])
+			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), -1*(y_upper_minus[1]-y_lower_minus[1])])
 		elif np.abs(x+self.radius) < delta:
 			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
-			tangent_upper = np.array([-2 * delta, y_upper_plus[1]-y_lower_plus[1]])
-			tangent_lower = np.array([-2 * delta, y_upper_plus[1]-y_lower_plus[1]])
+			tangent_upper = np.array([-1*np.abs(y_upper_plus[0]-y_upper_plus[0]), y_upper_plus[1]-y_lower_plus[1]])
+			tangent_lower = np.array([-1*np.abs(y_upper_plus[0]-y_upper_plus[0]), y_upper_plus[1]-y_lower_plus[1]])
 		else:
 			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
 			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
 
-			tangent_upper = np.array([2 * delta, y_upper_plus[1] - y_upper_minus[1]])
-			tangent_lower = np.array([-2 * delta, -1*(y_lower_plus[1] - y_lower_minus[1])])
+			tangent_upper = np.array([np.abs(y_upper_plus[0]-y_upper_minus[0]), y_upper_plus[1] - y_upper_minus[1]])
+			tangent_lower = np.array([-1 * np.abs(y_lower_plus[0]-y_lower_minus[0]), -1*(y_lower_plus[1] - y_lower_minus[1])])
 
 			
 
@@ -142,16 +142,16 @@ class Main:
         # Interpolate to find the y-coordinate at x
 		if np.abs(x-self.radius) < delta:
 			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
-			tangent_upper = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
-			tangent_lower = np.array([2 * delta, y_upper_minus[1]-y_lower_minus[1]])
+			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_minus[1]-y_lower_minus[1]])
+			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_minus[1]-y_lower_minus[1]])
 
 			normal_upper = np.array([tangent_upper[1], tangent_upper[0]])
 			normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])		
 		elif np.abs(x+self.radius) < delta:
 			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
-			tangent_upper = np.array([-2 * delta, y_upper_plus[1]-y_lower_plus[1]])
-			tangent_lower = np.array([-2 * delta, y_upper_plus[1]-y_lower_plus[1]])
+			tangent_upper = np.array([-1 * np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1]-y_lower_plus[1]])
+			tangent_lower = np.array([-1 * np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1]-y_lower_plus[1]])
 
 			normal_upper = np.array([-tangent_upper[1], tangent_upper[0]])
 			normal_lower = np.array([-tangent_lower[1], -tangent_lower[0]]) 
@@ -160,8 +160,8 @@ class Main:
 
 			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
 
-			tangent_upper = np.array([2 * delta, y_upper_plus[1] - y_upper_minus[1]])
-			tangent_lower = np.array([2 * delta, (y_lower_plus[1] - y_lower_minus[1])])
+			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1] - y_upper_minus[1]])
+			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), (y_lower_plus[1] - y_lower_minus[1])])
 
 
 			normal_upper = np.array([-tangent_upper[1], tangent_upper[0]])
@@ -185,10 +185,12 @@ class Main:
 		unit_tangent_upper, unit_tangent_lower = self.surface_tangent(x)
 
 		if upper:
-			velocity_upper = np.dot(self.flow.flow_over_cylinder_cartesin(x, np.sqrt(self.radius**2 - x**2)), unit_tangent_upper)
+			_, point, _ = self.geometry.circle(x)
+			velocity_upper = np.dot(self.flow.flow_over_cylinder_cartesin(point[0], point[1]), unit_tangent_upper)
 			return velocity_upper
 		else:
-			velocity_lower = np.dot(self.flow.flow_over_cylinder_cartesin(x, -np.sqrt(self.radius**2 - x**2)), unit_tangent_lower)
+			_, _, point = self.geometry.circle(x)
+			velocity_lower = np.dot(self.flow.flow_over_cylinder_cartesin(point[0], point[1]), unit_tangent_lower)
 			return velocity_lower
 
 	def velocity_derivative(self, x, upper=True):
@@ -321,6 +323,7 @@ class Main:
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
 		plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
 		plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
+
 		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]-1e-5, forward_stagnation_point[1], -1*delta_s)
 		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]+1e-5, aft_stagnation_point[1], delta_s)
 		plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='black')

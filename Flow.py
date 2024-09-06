@@ -43,6 +43,11 @@ class Flow:
 
         return velocity
     
+    def unit_velocity(self, x, y):
+        velocity = self.flow_over_cylinder_cartesin(x, y)
+        
+        return velocity / np.linalg.norm(velocity)
+    
     def test_flow(self, x, y):
 
         velocity = np.array([x, 0])
@@ -63,10 +68,10 @@ class Flow:
         streamline = []
 
         while True:
-            k1 = delta_s * self.flow_over_cylinder_cartesin(x, y)
-            k2 = delta_s * self.flow_over_cylinder_cartesin(x + 0.5*k1[0], y + 0.5*k1[1])
-            k3 = delta_s * self.flow_over_cylinder_cartesin(x + 0.5*k2[0], y + 0.5*k2[1])
-            k4 = delta_s * self.flow_over_cylinder_cartesin(x + k3[0], y + k3[1])
+            k1 = delta_s * self.unit_velocity(x, y)
+            k2 = delta_s * self.unit_velocity(x + 0.5*k1[0], y + 0.5*k1[1])
+            k3 = delta_s * self.unit_velocity(x + 0.5*k2[0], y + 0.5*k2[1])
+            k4 = delta_s * self.unit_velocity(x + k3[0], y + k3[1])
 
             x_new = x + (k1[0] + 2*k2[0] + 2*k3[0] + k4[0]) / 6
             y_new = y + (k1[1] + 2*k2[1] + 2*k3[1] + k4[1]) / 6

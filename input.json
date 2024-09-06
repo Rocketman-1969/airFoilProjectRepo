@@ -5,8 +5,8 @@
         "trailing_edge_x": 2.0
     },
     "operating": {
-        "u_inf": 1.0,
-        "alpha": -15.0
+        "u_inf": 10.0,
+        "alpha": 45
     },
     "plot": {
         "x_start": -5.0,
