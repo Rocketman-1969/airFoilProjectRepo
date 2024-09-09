@@ -2,12 +2,13 @@ import numpy as np
 
 class Flow:
 
-    def __init__(self, radius, V_inf, alpha, x_low_val, x_up_val):
+    def __init__(self, radius, V_inf, alpha, x_low_val, x_up_val, gamma=0):
         self.radius = radius
         self.V_inf = V_inf
         self.alpha = alpha
         self.x_low_val = x_low_val
         self.x_up_val = x_up_val
+        self.gamma = gamma
 
 
     def flow_over_cylinder_cartesin(self, x, y):
@@ -43,10 +44,25 @@ class Flow:
 
         return velocity
     
-    def unit_velocity(self, x, y):
-        velocity = self.flow_over_cylinder_cartesin(x, y)
+    def flow_over_cylinder_circulation(self, x, y):
+        r = np.sqrt(x**2 + y**2)
+        theta = np.arctan2(y, x)
+
+        alpha = np.deg2rad(self.alpha)
         
-        return velocity / np.linalg.norm(velocity)
+        r_dot = self.V_inf * (1 - (self.radius**2 / r**2))*np.cos(theta - alpha)
+        theta_dot = -(self.V_inf * (1 + (self.radius**2 / r**2))*np.sin(theta - alpha)+ self.gamma / (2 * np.pi * r))
+
+        x_dot = r_dot * np.cos(theta) - theta_dot * np.sin(theta)
+        y_dot = r_dot * np.sin(theta) + theta_dot * np.cos(theta)
+        velocity = np.array([x_dot, y_dot])
+
+        return velocity
+    
+    def unit_velocity(self, x, y):
+        velocity = self.flow_over_cylinder_circulation(x, y)
+        
+        return velocity
     
     def test_flow(self, x, y):
 

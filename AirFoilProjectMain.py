@@ -58,16 +58,17 @@ class Main:
 		with open(self.config_file, 'r') as file:
 			json_vals = json.load(file)
 		self.radius = json_vals['geometry']['cylinder_radius']
-		self.LE = json_vals['geometry']['leading_edge_x']
-		self.TE = json_vals['geometry']['trailing_edge_x']
+		self.LE = json_vals['geometry']['x_leading_edge']
+		self.TE = json_vals['geometry']['x_trailing_edge']
 		self.x_start = json_vals['plot']['x_start']
 		self.x_low_val = json_vals['plot']['x_lower_limit']
 		self.x_up_val = json_vals['plot']['x_upper_limit']
 		self.delta_s = json_vals['plot']['delta_s']
 		self.n_lines = json_vals['plot']['n_lines']
 		self.delta_y = json_vals['plot']['delta_y']
-		self.free_stream_velocity = json_vals['operating']['u_inf']
-		self.angle_of_attack = json_vals['operating']['alpha']
+		self.free_stream_velocity = json_vals['operating']['freestream_velocity']
+		self.angle_of_attack = json_vals['operating']['angle_of_attack[deg]']
+		self.gamma = json_vals['operating']['vortex_strength']
 
 
 	def setup_Geometry(self):
@@ -84,7 +85,7 @@ class Main:
 		V_inf (float): The free stream velocity.
 		alpha (float): The angle of attack.
 		"""
-		self.flow = Flow.Flow(self.radius, V_inf, alpha, self.x_low_val, self.x_up_val)
+		self.flow = Flow.Flow(self.radius, V_inf, alpha, self.x_low_val, self.x_up_val, self.gamma)
 
 	def surface_tangent(self, x):
 		"""
@@ -186,11 +187,11 @@ class Main:
 
 		if upper:
 			_, point, _ = self.geometry.circle(x)
-			velocity_upper = np.dot(self.flow.flow_over_cylinder_cartesin(point[0], point[1]), unit_tangent_upper)
+			velocity_upper = np.dot(self.flow.flow_over_cylinder_circulation(point[0], point[1]), unit_tangent_upper)
 			return velocity_upper
 		else:
 			_, _, point = self.geometry.circle(x)
-			velocity_lower = np.dot(self.flow.flow_over_cylinder_cartesin(point[0], point[1]), unit_tangent_lower)
+			velocity_lower = np.dot(self.flow.flow_over_cylinder_circulation(point[0], point[1]), unit_tangent_lower)
 			return velocity_lower
 
 	def velocity_derivative(self, x, upper=True):
@@ -256,7 +257,7 @@ class Main:
 		else:
 			if velocity_LE < 0:
                 # Use lower surface
-				upper_flag = False
+				upper_flag = True
 				def velocity_function(x):
 					return self.surface_tangential_velocity(x, upper=upper_flag)
 				def velocity_prime(x):
@@ -265,7 +266,7 @@ class Main:
 				_, _, aft_stagnation_point = self.geometry.circle(x_stag)
 			else:
                 # Use upper surface
-				upper_flag = True
+				upper_flag = False
 				def velocity_function(x):
 					return self.surface_tangential_velocity(x, upper=upper_flag)
 				def velocity_prime(x):
@@ -316,17 +317,17 @@ class Main:
 
 		# Set up the plot
 		plt.figure()
-		plt.plot(camber[0, :], camber[1, :], label='Camber')
-		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface', color='red')
-		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface',color='red')
+		plt.plot(camber[0, :], camber[1, :], label='Camber', color='red')
+		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface', color='blue')
+		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface',color='blue')
 		plt.xlabel('X')
 		plt.ylabel('Y')
-		plt.title('Airfoil Geometry')
+		plt.title('Streamlines')
 		# Calculate the streamlines
 		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]+forward_normal_stag[0] * 1e-3, forward_stagnation_point[1]+forward_normal_stag[1] * 1e-3, -1*delta_s)
 		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]+aft_normal_stag[0] * 1e-3, aft_stagnation_point[1] + aft_normal_stag[1]*1e-3, delta_s)
-		plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='blue')
-		plt.plot(aft_stag_streamline[:, 0], aft_stag_streamline[:, 1],color='blue')
+		plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='black')
+		plt.plot(aft_stag_streamline[:, 0], aft_stag_streamline[:, 1],color='black')
 
 		for i in range(n_lines):
 			x = x_start
@@ -336,8 +337,8 @@ class Main:
 			y = delta_y * (i+1) + forward_stag_streamline[-1,1]
 			streamline = self.flow.streamlines(x, y, delta_s)
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
-		plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
-		plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
+		# plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
+		# plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
 
 
 		plt.xlim(x_lower_limit, x_upper_limit)

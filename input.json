@@ -1,12 +1,13 @@
 {
     "geometry": {
         "cylinder_radius": 2.0,
-        "leading_edge_x": -2.0,
-        "trailing_edge_x": 2.0
+        "x_leading_edge": -2.0,
+        "x_trailing_edge": 2.0
     },
     "operating": {
-        "u_inf": 10.0,
-        "alpha": 15
+        "freestream_velocity": 10.0,
+        "angle_of_attack[deg]": 15,
+        "vortex_strength": 80.0
     },
     "plot": {
         "x_start": -5.0,
@@ -14,7 +15,7 @@
         "x_upper_limit": 5.0,
         "delta_s": 0.01,
         "n_lines": 20,
-        "delta_y": 0.3
+        "delta_y": 0.4
 
     }
 }
