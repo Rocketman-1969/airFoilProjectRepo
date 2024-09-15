@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import json
 import GeometeryClass
-import Flow
+from Flow import Flow
 from scipy.optimize import newton
 
 
@@ -49,6 +49,8 @@ class Main:
 			The path to the configuration file.
 		"""
 		self.config_file = config_file
+		self.elements = []
+		self.load_config()
 		
 
 	def load_config(self):
@@ -56,36 +58,23 @@ class Main:
 		Loads the configuration from the JSON file.
 		"""
 		with open(self.config_file, 'r') as file:
-			json_vals = json.load(file)
-		self.radius = json_vals['geometry']['cylinder_radius']
-		self.LE = json_vals['geometry']['x_leading_edge']
-		self.TE = json_vals['geometry']['x_trailing_edge']
-		self.x_start = json_vals['plot']['x_start']
-		self.x_low_val = json_vals['plot']['x_lower_limit']
-		self.x_up_val = json_vals['plot']['x_upper_limit']
-		self.delta_s = json_vals['plot']['delta_s']
-		self.n_lines = json_vals['plot']['n_lines']
-		self.delta_y = json_vals['plot']['delta_y']
-		self.free_stream_velocity = json_vals['operating']['freestream_velocity']
-		self.angle_of_attack = json_vals['operating']['angle_of_attack[deg]']
-		self.gamma = json_vals['operating']['vortex_strength']
-
-
-	def setup_Geometry(self):
-		"""
-		Initializes the Geometery object and calculates the camber, upper surface, and lower surface.
-		"""
-		self.geometry = GeometeryClass.Geometery(self.radius)
-		
-	def load_flow_field(self, V_inf, alpha):
+			config = json.load(file)
+			self.elements = list(config['elements'].values())
+			self.plot_config = config['plot']
+			
+	def load_flow_field(self):
 		"""
 		Loads the flow field parameters.
-
-		Parameters:
-		V_inf (float): The free stream velocity.
-		alpha (float): The angle of attack.
 		"""
-		self.flow = Flow.Flow(self.radius, V_inf, alpha, self.x_low_val, self.x_up_val, self.gamma)
+		self.flow = Flow(self.elements, self.plot_config["x_lower_limit"], self.plot_config["x_upper_limit"])
+		
+		# Initialize an empty dictionary to store elements
+		self.element_dict = {}
+		
+		# Loop through the elements and save each element in the dictionary
+		for index, element in enumerate(self.elements):
+			self.element_dict[f'element{index}'] = element
+
 
 	def surface_tangent(self, x):
 		"""
@@ -289,62 +278,50 @@ class Main:
 		n_lines (int): The number of streamlines to plot.
 		delta_y (float): The spacing between streamlines.
 		"""
-		x = np.linspace(-1 * self.radius, self.radius, 1000)
-		camber = np.empty((2, 0))
-		upper_surface = np.empty((2, 0))
-		lower_surface = np.empty((2, 0))
-
-		for i in range(len(x)):
-			camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.circle(x[i])
-
-			# Append the new values to the arrays
-			camber = np.hstack((camber, camber_temp.reshape(2, 1)))
-			upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
-			lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
-
-		#calculate stagnation points
-		forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
-		forward_normal_stag_up, forward_normal_stag_down = self.surface_normal(forward_stagnation_point[0])
-		aft_normal_stag_up, aft_normal_stag_down = self.surface_normal(aft_stagnation_point[0])
-		if forward_stagnation_point[1] < 0:
-			forward_normal_stag = forward_normal_stag_down
-		else:
-			forward_normal_stag = forward_normal_stag_up
-		if aft_stagnation_point[1] < 0:
-			aft_normal_stag = aft_normal_stag_down
-		else:
-			aft_normal_stag = aft_normal_stag_up
-
 		# Set up the plot
 		plt.figure()
-		plt.plot(camber[0, :], camber[1, :], label='Camber', color='red')
-		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface', color='blue')
-		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface',color='blue')
 		plt.xlabel('X')
 		plt.ylabel('Y')
 		plt.title('Streamlines')
-		# Calculate the streamlines
-		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]+forward_normal_stag[0] * 1e-3, forward_stagnation_point[1]+forward_normal_stag[1] * 1e-3, -1*delta_s)
-		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]+aft_normal_stag[0] * 1e-3, aft_stagnation_point[1] + aft_normal_stag[1]*1e-3, delta_s)
-		plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='black')
-		plt.plot(aft_stag_streamline[:, 0], aft_stag_streamline[:, 1],color='black')
+
+		x = x_start
+		y = 0
+		streamline = self.flow.streamlines(x, y, delta_s)
+		plt.plot(streamline[:, 0], streamline[:, 1],color='black')
 
 		for i in range(n_lines):
 			x = x_start
-			y = -delta_y * (i+1) + forward_stag_streamline[-1,1]
+			y = -delta_y * (i+1)
 			streamline = self.flow.streamlines(x, y, delta_s)
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
-			y = delta_y * (i+1) + forward_stag_streamline[-1,1]
+			y = delta_y * (i+1)
 			streamline = self.flow.streamlines(x, y, delta_s)
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
-		# plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
-		# plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
 
+		for element in self.elements:
+			if element['type'] == 'freestream':
+				continue  # Ignore freestream elements
 
+			x = element.get('x', 0)
+			y = element.get('y', 0)
+			if element['type'] == 'source':
+				magnitude = element['lambda']
+				marker = '*'
+			elif element['type'] == 'doublet':
+				magnitude = element['kappa']
+				marker = 'D'
+			elif element['type'] == 'vortex':
+				magnitude = element['gamma']
+				marker = 'x'
+
+			color = 'blue' if magnitude > 0 else 'red'
+			plt.scatter(x, y, color=color, s=10, marker=marker)
+		
 		plt.xlim(x_lower_limit, x_upper_limit)
 		plt.ylim(x_lower_limit, x_upper_limit)
 		plt.gca().set_aspect('equal', adjustable='box')
 		plt.show()
+
 
 
 	def run(self):
@@ -352,11 +329,12 @@ class Main:
 		Executes the main logic of the application.
 		"""
 		self.load_config()
-		self.setup_Geometry()
-		self.load_flow_field(self.free_stream_velocity, self.angle_of_attack)
+		
+		self.load_flow_field()
 
-		self.plot(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
-
+		self.plot(self.plot_config['x_start'], self.plot_config['x_lower_limit'], self.plot_config['x_upper_limit'], self.plot_config['delta_s'], self.plot_config['n_lines'], self.plot_config['delta_y'])
+		
+		
 		# streamlines_upper = self.flow.streamlines(-4.5,-.25,0.01)
 
 		# plt.plot(streamlines_upper[:,0], streamlines_upper[:,1],label='Streamlines Upper')
