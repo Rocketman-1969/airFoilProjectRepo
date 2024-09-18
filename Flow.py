@@ -2,132 +2,73 @@ import numpy as np
 
 class Flow:
 
-    def __init__(self, elements, x_low_val, x_up_val):
-        #print(self.elements)
-        self.elements = elements
+    def __init__(self, radius, V_inf, alpha, x_low_val, x_up_val, gamma=0):
+        self.radius = radius
+        self.V_inf = V_inf
+        self.alpha = alpha
         self.x_low_val = x_low_val
         self.x_up_val = x_up_val
-    
-    def freestream(self, velocity, alpha, point):
-        """
-        Set the freestream conditions.
-    
-        Parameters:
-        velocity (float): The freestream velocity.
-        alpha (float): The angle of attack in degrees.
-        """
-        r = np.sqrt((point[0])**2 + (point[1])**2)
-        theta = np.arctan2(point[1], point[0])
-        alpha = np.deg2rad(alpha)
+        self.gamma = gamma
 
-        r_dot = velocity * np.cos(theta - alpha)
-        theta_dot = -velocity * np.sin(theta - alpha)
+
+    def flow_over_cylinder_cartesin(self, x, y):
+        """
+        Calculates the camber line, upper surface, and lower surface of the circle.
+
+        Returns
+        -------
+        tuple
+            A tuple containing the camber line, upper surface, and lower surface as numpy arrays.
+        """
+        r = np.sqrt(x**2 + y**2)
+        theta = np.arctan2(y, x)
+
+        alpha = np.deg2rad(self.alpha)
+        
+        r_dot = self.V_inf * (1 - (self.radius**2 / r**2))*np.cos(theta - alpha)
+        theta_dot = -self.V_inf * (1 + (self.radius**2 / r**2))*np.sin(theta - alpha)
 
         x_dot = r_dot * np.cos(theta) - theta_dot * np.sin(theta)
         y_dot = r_dot * np.sin(theta) + theta_dot * np.cos(theta)
+        velocity = np.array([x_dot, y_dot])
+
+        # f_1 = self.V_inf * (1 - (self.radius**2 / r**2))*((costheta)*np.cos(self.alpha) + (sintheta)*np.sin(self.alpha))
+        # f_2 = -self.V_inf * (1 + (self.radius**2 / r**2))*((sintheta)*np.cos(self.alpha) - (costheta)*np.cos(self.alpha))
+
+        # velocity = np.array([f_1*(costheta) - f_2*(sintheta), f_1*(sintheta) + f_2*(costheta)])
+
+        # f_1 = self.V_inf * (1 - (self.radius**2 / (x**2 + y**2)))*((x / np.sqrt(x**2 + y**2))*np.cos(self.alpha) + (y / np.sqrt(x**2 + y**2))*np.sin(self.alpha))
+        # f_2 = self.V_inf * (1 + (self.radius**2 / (x**2 + y**2)))*((y / np.sqrt(x**2 + y**2))*np.cos(self.alpha) - (y / np.sqrt(x**2 + y**2))*np.cos(self.alpha))
+
+        #velocity = np.array([f_1*(x/(np.sqrt(x**2 + y**2))) - f_2*(y/np.sqrt(x**2 + y**2)), f_1*(y/(np.sqrt(x**2 + y**2))) + f_2*(x/np.sqrt(x**2 + y**2))])
+
+        return velocity
+    
+    def flow_over_cylinder_circulation(self, x, y):
+        r = np.sqrt(x**2 + y**2)
+        theta = np.arctan2(y, x)
+
+        alpha = np.deg2rad(self.alpha)
         
-
-        return x_dot, y_dot
-    
-    def source(self, strength, xs, ys, point):
-        """
-        Set the source strength and location.
-    
-        Parameters:
-        strength (float): The strength of the source.
-        xs (float): The x-coordinate of the source.
-        ys (float): The y-coordinate of the source.
-        """
-        r = np.sqrt((point[0] - xs)**2 + (point[1] - ys)**2)
-        theta = np.arctan2(point[1] - ys, point[0] - xs)
-
-        r_dot = strength / (2 * np.pi * r)
-        theta_dot = 0
-
-        x_dot = r_dot * np.cos(theta) - theta_dot * np.sin(theta)
-        y_dot = r_dot * np.sin(theta) + theta_dot * np.cos(theta)     
-
-        return x_dot, y_dot
-    
-    def vortex(self, strength, xs, ys, point):
-        """
-        Set the vortex strength and location.
-    
-        Parameters:
-        strength (float): The strength of the vortex.
-        xs (float): The x-coordinate of the vortex.
-        ys (float): The y-coordinate of the vortex.
-        """
-        r = np.sqrt((point[0] - xs)**2 + (point[1] - ys)**2)
-        theta = np.arctan2(point[1] - ys, point[0] - xs)
-
-        r_dot = 0
-        theta_dot = -strength / (2 * np.pi * r)
+        r_dot = self.V_inf * (1 - (self.radius**2 / r**2))*np.cos(theta - alpha)
+        theta_dot = -(self.V_inf * (1 + (self.radius**2 / r**2))*np.sin(theta - alpha)+ self.gamma / (2 * np.pi * r))
 
         x_dot = r_dot * np.cos(theta) - theta_dot * np.sin(theta)
         y_dot = r_dot * np.sin(theta) + theta_dot * np.cos(theta)
-        
+        velocity = np.array([x_dot, y_dot])
 
-        return x_dot, y_dot
-    
-    def doublet(self, strength, xs, ys, alpha, point):
-        """
-        Set the doublet strength and location.
-    
-        Parameters:
-        strength (float): The strength of the doublet.
-        xs (float): The x-coordinate of the doublet.
-        ys (float): The y-coordinate of the doublet.
-        alpha (float): The angle of the doublet.
-        """
-        alpha = np.deg2rad(alpha)
-
-        r = np.sqrt((point[0] - xs)**2 + (point[1] - ys)**2)
-        theta = np.arctan2(point[1] - ys, point[0] - xs)
-
-        r_dot = -(strength*np.cos(theta-alpha)) / (2 * np.pi * r**2)
-        theta_dot = -(strength*np.sin(theta-alpha)) / (2 * np.pi * r**2)
-
-        x_dot = r_dot * np.cos(theta) - theta_dot * np.sin(theta)
-        y_dot = r_dot * np.sin(theta) + theta_dot * np.cos(theta)
-
-        
-
-        return x_dot, y_dot
-    
-    def velocity_field(self, X, Y):
-        """
-        Calculate the velocity field.
-    
-        Parameters:
-        X (2D array): The x-coordinates of the mesh grid.
-        Y (2D array): The y-coordinates of the mesh grid.
-    
-        Returns:
-        tuple: A tuple containing the x-component and y-component of the velocity field.
-        """
-        Vx = 0
-        Vy = 0
-        
-        for element in self.elements:
-            if element['type'] == 'freestream':
-                u, v = self.freestream(element['velocity'], element['angle_of_attack'], [X, Y])
-            elif element['type'] == 'source':
-                u, v = self.source(element['lambda'], element['x'], element['y'], [X, Y])
-            elif element['type'] == 'vortex':
-                u, v = self.vortex(element['gamma'], element['x'], element['y'], [X, Y])
-            elif element['type'] == 'doublet':
-                u, v = self.doublet(element['kappa'], element['x'], element['y'], element['alpha'], [X, Y])
-            Vx += u
-            Vy += v
-            
-        return np.array([Vx, Vy])        
+        return velocity
     
     def unit_velocity(self, x, y):
-        velocity = self.velocity_field(x, y)
+        velocity = self.flow_over_cylinder_circulation(x, y)
         
         return velocity
+    
+    def test_flow(self, x, y):
 
+        velocity = np.array([x, 0])
+
+        return velocity
     
     def streamlines(self, x, y, delta_s):
         """
