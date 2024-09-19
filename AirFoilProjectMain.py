@@ -69,22 +69,26 @@ class Main:
 		self.n_lines = json_vals['plot']['n_lines']
 		self.delta_y = json_vals['plot']['delta_y']
 		self.free_stream_velocity = json_vals['operating']['freestream_velocity']
-		self.angle_of_attack = json_vals['operating']['angle_of_attack[deg]']
+		self.alpha_start = json_vals['operating']['alpha_start[deg]']
+		self.alpha_end = json_vals['operating']['alpha_end[deg]']
+		self.alpha_increment = json_vals['operating']['alpha_increment[deg]']
 		self.gamma = json_vals['operating']['vortex_strength']
-		self.airfoil_file = json_vals['geometry']['airfoil_file']
+		self.NACA = json_vals['geometry']['NACA']
+		self.chord = json_vals['geometry']['chord_length']
+		self.n_points = json_vals['geometry']['n_points']
 
-	def setup_vortex_pannel_method(self):
+	def setup_vortex_pannel_method(self, alpha):
 
-		self.pannelmethod = VortexPannelMethod(self.airfoil_file, self.free_stream_velocity, self.angle_of_attack)
+		self.pannelmethod = VortexPannelMethod(self.chord, self.free_stream_velocity, alpha)
 
 
 	def setup_Geometry(self):
 		"""
 		Initializes the Geometery object and calculates the camber, upper surface, and lower surface.
 		"""
-		self.geometry = GeometeryClass.Geometery(self.radius)
+		self.geometry = GeometeryClass.Geometery(self.radius, self.NACA, self.n_points)
 		
-	def load_flow_field(self, V_inf, alpha):
+	def load_flow_field(self):
 		"""
 		Loads the flow field parameters.
 
@@ -92,7 +96,7 @@ class Main:
 		V_inf (float): The free stream velocity.
 		alpha (float): The angle of attack.
 		"""
-		self.flow = Flow.Flow(self.radius, V_inf, alpha, self.x_low_val, self.x_up_val, self.gamma)
+		self.flow = Flow.Flow(self.radius, self.free_stream_velocity, self.angle_of_attack, self.x_low_val, self.x_up_val, self.gamma)
 
 	def surface_tangent(self, x):
 		"""
@@ -359,8 +363,33 @@ class Main:
 		Executes the main logic of the application.
 		"""
 		self.load_config()
-		self.setup_vortex_pannel_method()
-		self.pannelmethod.run()
+		self.setup_Geometry()
+
+		xcos = self.geometry.Cose_cluster(self.n_points)
+		
+		x, y = self.geometry.generate_naca4_airfoil(self.NACA, xcos)
+
+		#list of alphas from start to end with increment
+		alphas = np.arange(self.alpha_start, self.alpha_end, self.alpha_increment)
+		CLs = []
+		Cmles = []
+		Cmc4s = []
+		for alpha in alphas:
+			self.setup_vortex_pannel_method(alpha)
+			CL, Cmle, Cmc4 = self.pannelmethod.run(x, y)
+			CLs.append(CL[0])
+			Cmles.append(Cmle[0])
+			Cmc4s.append(Cmc4[0])
+		
+		plt.plot(alphas, CLs, label='CL')
+		plt.plot(alphas, Cmles, label='Cmle')
+		plt.plot(alphas, Cmc4s, label='Cmc4')
+		plt.legend(loc='upper right')
+		plt.xlabel('Alpha')
+		plt.ylabel('CL, Cmle, Cmc4')
+		plt.title('CL, Cmle, Cmc4 vs Alpha')
+		plt.show()
+
 
 		# self.setup_Geometry()
 		# self.load_flow_field(self.free_stream_velocity, self.angle_of_attack)

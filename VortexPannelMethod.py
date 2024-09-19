@@ -1,27 +1,14 @@
 import numpy as np
 class VortexPannelMethod:
 
-    def __init__(self, airfoil_file, velocity, alpha):
+    def __init__(self, chord, velocity, alpha):
         pass
         # opens json file and sets airfoil text file as an x and y array
 
-        self.airfoil_file = airfoil_file
         self.velocity = velocity
         self.alpha = alpha
+        self.chord = chord
     
-    def get_airfoil_points(self):
-        
-        # set up dictionary
-        filename = self.airfoil_file
-        with open(filename,"r") as f:
-            points = [ [float(i) for i in line.split()] for line in f.readlines() ]
-        # convert single aray into x y array
-        points = np.array(points)
-
-        x = points[:,0]
-        y = points[:,1]
-
-        return x, y
     
     def get_control_points(self, x, y):
         # equation (4.21)
@@ -58,20 +45,12 @@ class VortexPannelMethod:
     
     def get_P_matrix(self, x, y, x_cp, y_cp, i, j):
         l_j = self.get_length_of_jth_pannel(x, y, j)
-
-        print(f"l_j: {l_j}")
         
         xi, eta = self.get_xi_eta(x, y, x_cp, y_cp, l_j, i, j)
-
-        print(f"xi: {xi}, eta: {eta}")
         
         phi = self.get_phi(eta, xi, l_j)
-        
-        print(f"phi: {phi}")
 
         psi = self.get_psi(eta, xi, l_j)
-        
-        print(f"psi: {psi}")
 
         matrix1 = np.array([[(x[j+1]-x[j]), -1*(y[j+1]-y[j])],
         [(y[j+1]-y[j]), (x[j+1]-x[j])]])
@@ -112,57 +91,37 @@ class VortexPannelMethod:
         CL = 0
         for i in range(len(x)-1):
             l_i = self.get_length_of_jth_pannel(x, y, i)
-            CL += (l_i/1)*((gamma[i] + gamma[i+1])/self.velocity)
+            CL += (l_i/self.chord)*((gamma[i] + gamma[i+1])/self.velocity)
         return CL
     
     def get_cmle(self, gamma, x, y):
         Cmle_temp = 0
         for i in range(len(x)-1):
             l_i = self.get_length_of_jth_pannel(x, y, i)
-            Cmle_temp+=(l_i/1)*(((2*x[i]*gamma[i]+x[i]*gamma[i+1]+x[i+1]*gamma[i]+2*x[i+1]*gamma[i+1])/(1*self.velocity))*np.cos(np.deg2rad(self.alpha))+((2*y[i]*gamma[i]+y[i]*gamma[i+1]+y[i+1]*gamma[i]+2*y[i+1]*gamma[i+1])/(1*self.velocity))*np.sin(np.deg2rad(self.alpha)))
+            Cmle_temp+=(l_i/self.chord)*(((2*x[i]*gamma[i]+x[i]*gamma[i+1]+x[i+1]*gamma[i]+2*x[i+1]*gamma[i+1])/(self.chord*self.velocity))*np.cos(np.deg2rad(self.alpha))+((2*y[i]*gamma[i]+y[i]*gamma[i+1]+y[i+1]*gamma[i]+2*y[i+1]*gamma[i+1])/(self.chord*self.velocity))*np.sin(np.deg2rad(self.alpha)))
         Cmle=-(1/3)*Cmle_temp
         return Cmle
     
-    def get_Cmc4(self, x, y, CL, Cmle):
+    def get_Cmc4(self, CL, Cmle):
 
         Cmc4 = Cmle + CL/4 * np.cos(np.deg2rad(self.alpha))
 
         return Cmc4
     
-    def run(self):
-        x, y = self.get_airfoil_points()
+    def run(self, x, y):
+
         x_cp, y_cp = self.get_control_points(x, y)
-
-        # for element in y_cp:
-        #     print(f"{element:.15f}")
-
-        # P = self.get_P_matrix(x, y, x_cp, y_cp, 0, 8)
-
-        # for row in P:
-        #     for element in row:
-        #         print(f"{element:.15g}")
         
         A = self.get_A_matrix(x, y, x_cp, y_cp)
-        # print("A")
-        # for row in A:
-        #     for element in row:
-        #         print(f"{element:.15g}")
+
         B = self.get_B_matrix(x, y)
-        print("B")
-        for row in B:
-            for element in row:
-                print(f"{element:.15}")
+       
         gamma = self.get_gamma(A, B)
 
-        print("gamma")
-        for row in gamma:
-            for element in row:
-                print(f"{element:.15}")
-        CL = self.get_CL(gamma, x, y)
-        Cmle = self.get_cmle(gamma, x, y)
-        Cmc4 = self.get_Cmc4(x, y, CL, Cmle)
+        C_L = self.get_CL(gamma, x, y)
 
-        print("CL: ", CL)
-        print("Cmle: ", Cmle)
-        print("Cmc4: ", Cmc4)
-        return 0
+        Cmle = self.get_cmle(gamma, x, y)
+
+        Cmc4 = self.get_Cmc4(C_L, Cmle)
+
+        return C_L, Cmle, Cmc4
