@@ -1,14 +1,16 @@
 import numpy as np
+from VortexPannelMethod import VortexPannelMethod as vpm
 
 class Flow:
 
-    def __init__(self, radius, V_inf, alpha, x_low_val, x_up_val, gamma=0):
+    def __init__(self, radius, V_inf, alpha, x_low_val, x_up_val, gamma=0, vortex_pannel_method=None):
         self.radius = radius
         self.V_inf = V_inf
         self.alpha = alpha
         self.x_low_val = x_low_val
         self.x_up_val = x_up_val
         self.gamma = gamma
+        self.vpm = vortex_pannel_method
 
 
     def flow_over_cylinder_cartesin(self, x, y):
@@ -56,6 +58,18 @@ class Flow:
         x_dot = r_dot * np.cos(theta) - theta_dot * np.sin(theta)
         y_dot = r_dot * np.sin(theta) + theta_dot * np.cos(theta)
         velocity = np.array([x_dot, y_dot])
+
+        return velocity
+    
+    def flow_around_an_airfoil(self, x, y, x_cp, y_cp, gamma):
+        alpha = np.deg2rad(self.alpha)
+        P=[]
+        for i in x_cp:
+            j =i
+            P_temp= self.vpm.get_P_matrix(x, y, x_cp, y_cp, i, j)
+            P += np.matmul(P_temp, np.array([[gamma[i]],[gamma[i+1]]]))
+
+        velocity = self.V_inf*np.array([[np.cos(alpha)],[np.sin(alpha)]]) + P
 
         return velocity
     

@@ -124,4 +124,4 @@ class VortexPannelMethod:
 
         Cmc4 = self.get_Cmc4(C_L, Cmle)
 
-        return C_L, Cmle, Cmc4
+        return C_L, Cmle, Cmc4, x_cp, y_cp, gamma

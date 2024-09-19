@@ -88,7 +88,7 @@ class Main:
 		"""
 		self.geometry = GeometeryClass.Geometery(self.radius, self.NACA, self.n_points)
 		
-	def load_flow_field(self):
+	def load_flow_field(self, alpha):
 		"""
 		Loads the flow field parameters.
 
@@ -96,7 +96,7 @@ class Main:
 		V_inf (float): The free stream velocity.
 		alpha (float): The angle of attack.
 		"""
-		self.flow = Flow.Flow(self.radius, self.free_stream_velocity, self.angle_of_attack, self.x_low_val, self.x_up_val, self.gamma)
+		self.flow = Flow.Flow(self.radius, self.free_stream_velocity, alpha, self.x_low_val, self.x_up_val, self.gamma, self.pannelmethod)
 
 	def surface_tangent(self, x):
 		"""
@@ -364,31 +364,35 @@ class Main:
 		"""
 		self.load_config()
 		self.setup_Geometry()
+		self.setup_vortex_pannel_method(0.0)
+		self.load_flow_field(0.0)
 
 		xcos = self.geometry.Cose_cluster(self.n_points)
 		
 		x, y = self.geometry.generate_naca4_airfoil(self.NACA, xcos)
 
 		#list of alphas from start to end with increment
-		alphas = np.arange(self.alpha_start, self.alpha_end, self.alpha_increment)
+		alpha = 0.0
 		CLs = []
 		Cmles = []
 		Cmc4s = []
-		for alpha in alphas:
-			self.setup_vortex_pannel_method(alpha)
-			CL, Cmle, Cmc4 = self.pannelmethod.run(x, y)
-			CLs.append(CL[0])
-			Cmles.append(Cmle[0])
-			Cmc4s.append(Cmc4[0])
 		
-		plt.plot(alphas, CLs, label='CL')
-		plt.plot(alphas, Cmles, label='Cmle')
-		plt.plot(alphas, Cmc4s, label='Cmc4')
-		plt.legend(loc='upper right')
-		plt.xlabel('Alpha')
-		plt.ylabel('CL, Cmle, Cmc4')
-		plt.title('CL, Cmle, Cmc4 vs Alpha')
-		plt.show()
+	
+		CL, Cmle, Cmc4, x_cp, y_cp, gamma = self.pannelmethod.run(x, y)
+
+		velocity = self.flow.flow_around_an_airfoil(-1, 0, x_cp, y_cp, gamma)
+
+		print(velocity)
+		
+		
+		# plt.plot(alphas, CLs, label='CL')
+		# plt.plot(alphas, Cmles, label='Cmle')
+		# plt.plot(alphas, Cmc4s, label='Cmc4')
+		# plt.legend(loc='upper right')
+		# plt.xlabel('Alpha')
+		# plt.ylabel('CL, Cmle, Cmc4')
+		# plt.title('CL, Cmle, Cmc4 vs Alpha')
+		# plt.show()
 
 
 		# self.setup_Geometry()
