@@ -3,64 +3,13 @@ from VortexPannelMethod import VortexPannelMethod as vpm
 
 class Flow:
 
-    def __init__(self, radius, V_inf, alpha, x_low_val, x_up_val, gamma=0, vortex_pannel_method=None):
-        self.radius = radius
+    def __init__(self, V_inf, alpha, x_low_val, x_up_val, vortex_pannel_method=None):
         self.V_inf = V_inf
         self.alpha = alpha
         self.x_low_val = x_low_val
         self.x_up_val = x_up_val
-        self.gamma = gamma
         self.vpm = vortex_pannel_method
 
-
-    def flow_over_cylinder_cartesin(self, x, y):
-        """
-        Calculates the camber line, upper surface, and lower surface of the circle.
-
-        Returns
-        -------
-        tuple
-            A tuple containing the camber line, upper surface, and lower surface as numpy arrays.
-        """
-        r = np.sqrt(x**2 + y**2)
-        theta = np.arctan2(y, x)
-
-        alpha = np.deg2rad(self.alpha)
-        
-        r_dot = self.V_inf * (1 - (self.radius**2 / r**2))*np.cos(theta - alpha)
-        theta_dot = -self.V_inf * (1 + (self.radius**2 / r**2))*np.sin(theta - alpha)
-
-        x_dot = r_dot * np.cos(theta) - theta_dot * np.sin(theta)
-        y_dot = r_dot * np.sin(theta) + theta_dot * np.cos(theta)
-        velocity = np.array([x_dot, y_dot])
-
-        # f_1 = self.V_inf * (1 - (self.radius**2 / r**2))*((costheta)*np.cos(self.alpha) + (sintheta)*np.sin(self.alpha))
-        # f_2 = -self.V_inf * (1 + (self.radius**2 / r**2))*((sintheta)*np.cos(self.alpha) - (costheta)*np.cos(self.alpha))
-
-        # velocity = np.array([f_1*(costheta) - f_2*(sintheta), f_1*(sintheta) + f_2*(costheta)])
-
-        # f_1 = self.V_inf * (1 - (self.radius**2 / (x**2 + y**2)))*((x / np.sqrt(x**2 + y**2))*np.cos(self.alpha) + (y / np.sqrt(x**2 + y**2))*np.sin(self.alpha))
-        # f_2 = self.V_inf * (1 + (self.radius**2 / (x**2 + y**2)))*((y / np.sqrt(x**2 + y**2))*np.cos(self.alpha) - (y / np.sqrt(x**2 + y**2))*np.cos(self.alpha))
-
-        #velocity = np.array([f_1*(x/(np.sqrt(x**2 + y**2))) - f_2*(y/np.sqrt(x**2 + y**2)), f_1*(y/(np.sqrt(x**2 + y**2))) + f_2*(x/np.sqrt(x**2 + y**2))])
-
-        return velocity
-    
-    def flow_over_cylinder_circulation(self, x, y):
-        r = np.sqrt(x**2 + y**2)
-        theta = np.arctan2(y, x)
-
-        alpha = np.deg2rad(self.alpha)
-        
-        r_dot = self.V_inf * (1 - (self.radius**2 / r**2))*np.cos(theta - alpha)
-        theta_dot = -(self.V_inf * (1 + (self.radius**2 / r**2))*np.sin(theta - alpha)+ self.gamma / (2 * np.pi * r))
-
-        x_dot = r_dot * np.cos(theta) - theta_dot * np.sin(theta)
-        y_dot = r_dot * np.sin(theta) + theta_dot * np.cos(theta)
-        velocity = np.array([x_dot, y_dot])
-
-        return velocity
-    
     def flow_around_an_airfoil(self, x, y, x_arb, y_arb, gamma):
         alpha = np.deg2rad(self.alpha)
         P=[]
@@ -80,12 +29,6 @@ class Flow:
     def unit_velocity(self, x_arb, y_arb, x_geo, y_geo, gamma):
         velocity = self.flow_around_an_airfoil(x_geo, y_geo, x_arb, y_arb, gamma)
         
-        return velocity
-    
-    def test_flow(self, x, y):
-
-        velocity = np.array([x, 0])
-
         return velocity
     
     def streamlines(self, x, y, delta_s, x_geo, y_geo, gamma):

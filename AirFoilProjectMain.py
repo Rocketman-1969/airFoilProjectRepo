@@ -59,7 +59,6 @@ class Main:
 		"""
 		with open(self.config_file, 'r') as file:
 			json_vals = json.load(file)
-		self.radius = json_vals['geometry']['cylinder_radius']
 		self.LE = json_vals['geometry']['x_leading_edge']
 		self.TE = json_vals['geometry']['x_trailing_edge']
 		self.x_start = json_vals['plot']['x_start']
@@ -69,10 +68,7 @@ class Main:
 		self.n_lines = json_vals['plot']['n_lines']
 		self.delta_y = json_vals['plot']['delta_y']
 		self.free_stream_velocity = json_vals['operating']['freestream_velocity']
-		self.alpha_start = json_vals['operating']['alpha_start[deg]']
-		self.alpha_end = json_vals['operating']['alpha_end[deg]']
-		self.alpha_increment = json_vals['operating']['alpha_increment[deg]']
-		self.gamma = json_vals['operating']['vortex_strength']
+		self.alpha = json_vals['operating']['angle_of_attack']
 		self.NACA = json_vals['geometry']['NACA']
 		self.chord = json_vals['geometry']['chord_length']
 		self.n_points = json_vals['geometry']['n_points']
@@ -86,7 +82,7 @@ class Main:
 		"""
 		Initializes the Geometery object and calculates the camber, upper surface, and lower surface.
 		"""
-		self.geometry = GeometeryClass.Geometery(self.radius, self.NACA, self.n_points)
+		self.geometry = GeometeryClass.Geometery(self.NACA, self.n_points)
 		
 	def load_flow_field(self, alpha):
 		"""
@@ -96,7 +92,7 @@ class Main:
 		V_inf (float): The free stream velocity.
 		alpha (float): The angle of attack.
 		"""
-		self.flow = Flow.Flow(self.radius, self.free_stream_velocity, alpha, self.x_low_val, self.x_up_val, self.gamma, self.pannelmethod)
+		self.flow = Flow.Flow(self.free_stream_velocity, alpha, self.x_low_val, self.x_up_val, self.pannelmethod)
 
 	def surface_tangent(self, x):
 		"""
@@ -109,7 +105,7 @@ class Main:
         Returns:
         tuple: A tuple containing the unit normal vectors for the upper and lower surfaces.
         """
-		delta = 1e-5  # Small perturbation for numerical differentiation
+		delta = 1e-3  # Small perturbation for numerical differentiation
 
         # Interpolate to find the y-coordinate at x
 		if np.abs(x-self.chord) < delta:
@@ -149,35 +145,10 @@ class Main:
         Returns:
         np.ndarray: The unit tangent vector at the given x-coordinate.
         """
-		delta = 1e-5  # Small perturbation for numerical differentiation
+		unit_tangent_upper, unit_tangent_lower = self.surface_tangent(x)
 
-        # Interpolate to find the y-coordinate at x
-		if np.abs(x-self.radius) < delta:
-			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
-			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_minus[1]-y_lower_minus[1]])
-			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_minus[1]-y_lower_minus[1]])
-
-			normal_upper = np.array([tangent_upper[1], tangent_upper[0]])
-			normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])		
-		elif np.abs(x+self.radius) < delta:
-			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
-
-			tangent_upper = np.array([-1 * np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1]-y_lower_plus[1]])
-			tangent_lower = np.array([-1 * np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1]-y_lower_plus[1]])
-
-			normal_upper = np.array([-tangent_upper[1], tangent_upper[0]])
-			normal_lower = np.array([-tangent_lower[1], -tangent_lower[0]]) 
-		else:
-			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
-
-			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
-
-			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1] - y_upper_minus[1]])
-			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), (y_lower_plus[1] - y_lower_minus[1])])
-
-
-			normal_upper = np.array([-tangent_upper[1], tangent_upper[0]])
-			normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])
+		normal_upper = np.cross([unit_tangent_upper[0], unit_tangent_upper[1], 0], [0, 0, 1])
+		normal_lower = np.cross([unit_tangent_lower[0], unit_tangent_lower[1], 0], [0, 0, 1])
 
 		unit_normal_upper = normal_upper / np.linalg.norm(normal_upper)	
 		unit_normal_lower = normal_lower / np.linalg.norm(normal_lower)
@@ -371,11 +342,10 @@ class Main:
 		"""
 		Executes the main logic of the application.
 		"""
-		alpha = 7.0
 		self.load_config()
 		self.setup_Geometry()
-		self.setup_vortex_pannel_method(alpha)
-		self.load_flow_field(alpha)
+		self.setup_vortex_pannel_method(self.alpha)
+		self.load_flow_field(self.alpha)
 
 		self.xcos = self.geometry.Cose_cluster(self.n_points)
 		

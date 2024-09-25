@@ -11,7 +11,7 @@ class Geometery:
         Calculates the camber line, upper surface, and lower surface of the circle.
     """
 
-    def __init__(self, radius, NACA, n_points):
+    def __init__(self, NACA, n_points):
         """
         Constructs all the necessary attributes for the Geometery object.
 
@@ -20,25 +20,9 @@ class Geometery:
         radius : float
             The radius of the circle.
         """
-        self.radius = radius
         self.NACA = str(int(NACA))
         self.n_points = n_points
 
-    def circle(self,x):
-        """
-        Calculates the camber line, upper surface, and lower surface of the circle.
-
-        Returns
-        -------
-        tuple
-            A tuple containing the camber line, upper surface, and lower surface as numpy arrays.
-        """
-
-        upper_surface = np.array([x, np.sqrt(self.radius**2 - x**2)])
-        lower_surface = np.array([x, -np.sqrt(self.radius**2 - x**2)])
-        camber = np.array([x, 0])
-
-        return camber, upper_surface, lower_surface
     
     def Cose_cluster(self, n_points):
             # Define step size for odd or even number of points
