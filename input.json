@@ -1,25 +1,25 @@
 {
     "geometry": {
         "cylinder_radius": 2.0,
-        "x_leading_edge": -2.0,
-        "x_trailing_edge": 2.0,
-        "NACA": "0015",
+        "x_leading_edge": 0.0,
+        "x_trailing_edge": 1.0,
+        "NACA": "2410",
         "n_points": 200,
         "chord_length": 1.0
     },
     "operating": {
         "freestream_velocity": 10.0,
-        "alpha_start[deg]": -12.0,
+        "alpha_start[deg]": 0.0,
         "alpha_end[deg]": 16.0,
         "alpha_increment[deg]": 2.0,
         "vortex_strength": 80.0
     },
     "plot": {
-        "x_start": -5.0,
-        "x_lower_limit": -5.0,
-        "x_upper_limit": 5.0,
+        "x_start": -1.0,
+        "x_lower_limit": -1.0,
+        "x_upper_limit": 2.0,
         "delta_s": 0.01,
-        "n_lines": 20,
-        "delta_y": 0.4
+        "n_lines": 15,
+        "delta_y": 0.1
     }
 }

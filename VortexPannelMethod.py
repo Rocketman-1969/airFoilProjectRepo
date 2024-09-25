@@ -23,11 +23,11 @@ class VortexPannelMethod:
         length_pannel=np.sqrt(np.power(x[j+1]-x[j],2)+np.power(y[j+1]-y[j],2))
         return length_pannel
     
-    def get_xi_eta(self, x, y, x_cp, y_cp, l_j, i, j):
+    def get_xi_eta(self, x, y, x_cp, y_cp, l_j, j):
         xi_eta = []
 
         matrix1 = np.array([[x[j+1]-x[j], y[j+1]-y[j]], [-(y[j+1]-y[j]), x[j+1]-x[j]]])
-        matrix2 = np.array([x_cp[i]-x[j], y_cp[i]-y[j]])
+        matrix2 = np.array([x_cp-x[j], y_cp-y[j]])
 
         xi_eta =(1/l_j) * np.matmul(matrix1, matrix2)
         xi = xi_eta[0]
@@ -46,7 +46,7 @@ class VortexPannelMethod:
     def get_P_matrix(self, x, y, x_cp, y_cp, i, j):
         l_j = self.get_length_of_jth_pannel(x, y, j)
         
-        xi, eta = self.get_xi_eta(x, y, x_cp, y_cp, l_j, i, j)
+        xi, eta = self.get_xi_eta(x, y, x_cp, y_cp, l_j, j)
         
         phi = self.get_phi(eta, xi, l_j)
 
@@ -62,7 +62,7 @@ class VortexPannelMethod:
         A = np.zeros((len(x), len(x)))
         for i in range(len(x)-1):
             for j in range(len(x)-1):
-                P = self.get_P_matrix(x, y, x_cp, y_cp, i, j)
+                P = self.get_P_matrix(x, y, x_cp[i], y_cp[i], i, j)
 
                 l_i = self.get_length_of_jth_pannel(x, y, i)
 

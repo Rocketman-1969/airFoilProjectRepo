@@ -61,20 +61,24 @@ class Flow:
 
         return velocity
     
-    def flow_around_an_airfoil(self, x, y, x_cp, y_cp, gamma):
+    def flow_around_an_airfoil(self, x, y, x_arb, y_arb, gamma):
         alpha = np.deg2rad(self.alpha)
         P=[]
-        for i in x_cp:
-            j =i
-            P_temp= self.vpm.get_P_matrix(x, y, x_cp, y_cp, i, j)
-            P += np.matmul(P_temp, np.array([[gamma[i]],[gamma[i+1]]]))
+        Vx = self.V_inf*np.cos(alpha)
+        Vy = self.V_inf*np.sin(alpha)
+        for i in range(len(x)-1):
+    
+            P= self.vpm.get_P_matrix(x, y, x_arb, y_arb, i, j=i)
 
-        velocity = self.V_inf*np.array([[np.cos(alpha)],[np.sin(alpha)]]) + P
+            Vx += gamma[i]*P[0,0]+gamma[i+1]*P[0,1]
+            Vy += gamma[i]*P[1,0]+gamma[i+1]*P[1,1]
+
+        velocity = np.array([Vx[0], Vy[0]])
 
         return velocity
     
-    def unit_velocity(self, x, y):
-        velocity = self.flow_over_cylinder_circulation(x, y)
+    def unit_velocity(self, x_arb, y_arb, x_geo, y_geo, gamma):
+        velocity = self.flow_around_an_airfoil(x_geo, y_geo, x_arb, y_arb, gamma)
         
         return velocity
     
@@ -84,7 +88,7 @@ class Flow:
 
         return velocity
     
-    def streamlines(self, x, y, delta_s):
+    def streamlines(self, x, y, delta_s, x_geo, y_geo, gamma):
         """
         Calculate the streamlines at a given x-coordinate.
     
@@ -96,12 +100,13 @@ class Flow:
         tuple: A tuple containing the streamlines for the upper and lower surfaces.
         """
         streamline = []
-
+        iter = 0
+        point=[x, y]
         while True:
-            k1 = delta_s * self.unit_velocity(x, y)
-            k2 = delta_s * self.unit_velocity(x + 0.5*k1[0], y + 0.5*k1[1])
-            k3 = delta_s * self.unit_velocity(x + 0.5*k2[0], y + 0.5*k2[1])
-            k4 = delta_s * self.unit_velocity(x + k3[0], y + k3[1])
+            k1 = delta_s * self.unit_velocity(x, y, x_geo, y_geo, gamma)
+            k2 = delta_s * self.unit_velocity(x + 0.5*k1[0], y + 0.5*k1[1], x_geo, y_geo, gamma)
+            k3 = delta_s * self.unit_velocity(x + 0.5*k2[0], y + 0.5*k2[1], x_geo, y_geo, gamma)
+            k4 = delta_s * self.unit_velocity(x + k3[0], y + k3[1], x_geo, y_geo, gamma)
 
             x_new = x + (k1[0] + 2*k2[0] + 2*k3[0] + k4[0]) / 6
             y_new = y + (k1[1] + 2*k2[1] + 2*k3[1] + k4[1]) / 6
@@ -112,7 +117,12 @@ class Flow:
             y = y_new
 
             if x_new < self.x_low_val or x_new > self.x_up_val:
+                
                 break
+            if iter > 1000:
+               
+                break
+            iter += 1
 
             
         return np.array(streamline)

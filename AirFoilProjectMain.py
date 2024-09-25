@@ -112,19 +112,19 @@ class Main:
 		delta = 1e-5  # Small perturbation for numerical differentiation
 
         # Interpolate to find the y-coordinate at x
-		if np.abs(x-self.radius) < delta:
-			_, y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+		if np.abs(x-self.chord) < delta:
+			y_upper_minus, y_lower_minus = self.geometry.generate_naca4_airfoil(self.NACA,x-delta)
 			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), -1*(y_upper_minus[1]-y_lower_minus[1])])
 			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), -1*(y_upper_minus[1]-y_lower_minus[1])])
-		elif np.abs(x+self.radius) < delta:
-			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
+		elif np.abs(x) < delta:
+			y_upper_plus, y_lower_plus = self.geometry.generate_naca4_airfoil(self.NACA,x+delta)
 
 			tangent_upper = np.array([-1*np.abs(y_upper_plus[0]-y_upper_plus[0]), y_upper_plus[1]-y_lower_plus[1]])
 			tangent_lower = np.array([-1*np.abs(y_upper_plus[0]-y_upper_plus[0]), y_upper_plus[1]-y_lower_plus[1]])
 		else:
-			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
+			y_upper_plus, y_lower_plus = self.geometry.generate_naca4_airfoil(self.NACA,x+delta)
 
-			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
+			y_upper_minus, y_lower_minus = self.geometry.generate_naca4_airfoil(self.NACA,x-delta)
 
 			tangent_upper = np.array([np.abs(y_upper_plus[0]-y_upper_minus[0]), y_upper_plus[1] - y_upper_minus[1]])
 			tangent_lower = np.array([-1 * np.abs(y_lower_plus[0]-y_lower_minus[0]), -1*(y_lower_plus[1] - y_lower_minus[1])])
@@ -196,36 +196,19 @@ class Main:
 		"""
 		unit_tangent_upper, unit_tangent_lower = self.surface_tangent(x)
 
+		x_geo,y_geo = self.geometry.generate_naca4_airfoil(self.NACA,self.xcos)
+
 		if upper:
-			_, point, _ = self.geometry.circle(x)
-			velocity_upper = np.dot(self.flow.flow_over_cylinder_circulation(point[0], point[1]), unit_tangent_upper)
+			point, _ = self.geometry.generate_naca4_airfoil(self.NACA,x)
+			velocity = self.flow.flow_around_an_airfoil(x_geo, y_geo, point[0], point[1], self.gamma)
+			velocity_upper = np.dot(velocity, unit_tangent_upper)
 			return velocity_upper
 		else:
-			_, _, point = self.geometry.circle(x)
-			velocity_lower = np.dot(self.flow.flow_over_cylinder_circulation(point[0], point[1]), unit_tangent_lower)
+			_, point = self.geometry.generate_naca4_airfoil(self.NACA, x)
+			velocity = self.flow.flow_around_an_airfoil(x_geo, y_geo, point[0], point[1], self.gamma)
+			velocity_lower = np.dot(velocity, unit_tangent_lower)	
 			return velocity_lower
 
-	def velocity_derivative(self, x, upper=True):
-		"""
-		Calculate the derivative of the velocity at a given x-coordinate.
-
-		Parameters:
-		x (float): The x-coordinate at which to calculate the velocity derivative.
-
-		Returns:
-		tuple: A tuple containing the velocity derivative for the upper and lower surfaces.
-		"""
-		delta = 1e-5
-		if upper:
-			velocity_upper_plus = self.surface_tangential_velocity(x + delta, upper=True)
-			velocity_upper_minus = self.surface_tangential_velocity(x - delta, upper=True)
-			velocity_derivative_upper = (velocity_upper_plus - velocity_upper_minus) / (2 * delta)
-			return velocity_derivative_upper
-		else:
-			velocity_lower_plus = self.surface_tangential_velocity(x + delta, upper=False)
-			velocity_lower_minus = self.surface_tangential_velocity(x - delta, upper=False)
-			velocity_derivative_lower = (velocity_lower_plus - velocity_lower_minus) / (2 * delta)
-			return velocity_derivative_lower
 
 	
 	def stagnation_point(self):
@@ -239,7 +222,6 @@ class Main:
 
         # Check leading edge (LE) and trailing edge (TE)
 		velocity_LE = self.surface_tangential_velocity(self.LE)
-		velocity_TE = self.surface_tangential_velocity(self.TE)
 
 		if np.abs(velocity_LE) < epsilon:
 			forward_stagnation_point = [self.LE, 0]
@@ -249,45 +231,68 @@ class Main:
 				upper_flag = True
 				def velocity_function(x):
 					return self.surface_tangential_velocity(x, upper=upper_flag)
-				def velocity_prime(x):
-					return self.velocity_derivative(x, upper=upper_flag)
-				x_stag = newton(velocity_function, self.LE + 0.01, fprime=velocity_prime, tol=epsilon)
-				_, forward_stagnation_point, _ = self.geometry.circle(x_stag)
+				x_stag = self.bisection_method(velocity_function, self.LE, self.TE-0.1)
+				forward_stagnation_point, _ = self.geometry.generate_naca4_airfoil(self.NACA,x_stag)
 			else:
                 # Use lower surface
 				upper_flag = False
 				def velocity_function(x):
 					return self.surface_tangential_velocity(x, upper=upper_flag)
-				def velocity_prime(x):
-					return self.velocity_derivative(x, upper=upper_flag)
-				x_stag = newton(velocity_function, self.LE + 0.01, fprime=velocity_prime, tol=epsilon)
-				_, _, forward_stagnation_point = self.geometry.circle(x_stag)
+				x_stag = self.bisection_method(velocity_function, self.LE, self.TE-0.1, tol=epsilon)
+				_, forward_stagnation_point = self.geometry.generate_naca4_airfoil(self.NACA,x_stag)
 
-		if np.abs(velocity_TE) < epsilon:
-			aft_stagnation_point = [self.TE, 0]
-		else:
-			if velocity_LE < 0:
-                # Use lower surface
-				upper_flag = True
-				def velocity_function(x):
-					return self.surface_tangential_velocity(x, upper=upper_flag)
-				def velocity_prime(x):
-					return self.velocity_derivative(x, upper=upper_flag)
-				x_stag = newton(velocity_function, self.TE - 0.01, fprime=velocity_prime, tol=epsilon)
-				_, _, aft_stagnation_point = self.geometry.circle(x_stag)
-			else:
-                # Use upper surface
-				upper_flag = False
-				def velocity_function(x):
-					return self.surface_tangential_velocity(x, upper=upper_flag)
-				def velocity_prime(x):
-					return self.velocity_derivative(x, upper=upper_flag)
-				x_stag = newton(velocity_function, self.TE - 0.01, fprime=velocity_prime, tol=epsilon)
-				_, aft_stagnation_point, _ = self.geometry.circle(x_stag)
+		aft_stagnation_point = [1, 0]
 
 		return forward_stagnation_point, aft_stagnation_point
 
-	
+	def bisection_method(self,f, a, b, tol=1e-6, max_iter=100):
+		"""
+		Bisection method to find the root of a function f(x) = 0.
+		
+		Parameters:
+		f: function
+			The function for which the root is to be found.
+		a: float
+			Left endpoint of the interval.
+		b: float
+			Right endpoint of the interval.
+		tol: float, optional
+			Tolerance for the root. The method stops when |b - a| < tol.
+		max_iter: int, optional
+			Maximum number of iterations to perform.
+		
+		Returns:
+		float
+			The approximation for the root, or None if no root was found within the interval.
+		"""
+		
+		# Check if a root is guaranteed in the initial interval
+		if f(a) * f(b) >= 0:
+			print("Bisection method fails. The function must have different signs at the endpoints.")
+			return None
+		
+		for i in range(max_iter):
+			# Calculate midpoint
+			c = (a + b) / 2
+			
+			# Check if the function value at the midpoint is close enough to zero
+			if abs(f(c)) < tol or (b - a) / 2 < tol:
+				print(f"Root found after {i+1} iterations: {c}")
+				return c
+			
+			# Update the interval based on the sign of f(c)
+			if f(c) * f(a) < 0:
+				b = c  # Root is in the left half
+			else:
+				a = c  # Root is in the right half
+		
+		print("Warning: Maximum number of iterations reached.")
+		return None
+    
+		# If max_iter is reached, return the last value
+		print("Maximum number of iterations reached.")
+		return x1, max_iter
+		
 	def plot(self, x_start, x_lower_limit, x_upper_limit, delta_s, n_lines, delta_y):
 		"""
 		Plot the streamlines for the flow field.
@@ -300,21 +305,20 @@ class Main:
 		n_lines (int): The number of streamlines to plot.
 		delta_y (float): The spacing between streamlines.
 		"""
-		x = np.linspace(-1 * self.radius, self.radius, 1000)
-		camber = np.empty((2, 0))
+		x = self.geometry.Cose_cluster(self.n_points)
 		upper_surface = np.empty((2, 0))
 		lower_surface = np.empty((2, 0))
 
 		for i in range(len(x)):
-			camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.circle(x[i])
+			upper_surface_temp, lower_surface_temp = self.geometry.generate_naca4_airfoil(self.NACA,x[i])
 
 			# Append the new values to the arrays
-			camber = np.hstack((camber, camber_temp.reshape(2, 1)))
 			upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
 			lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
 
 		#calculate stagnation points
 		forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
+		print("Forward Stagnation Point: ", forward_stagnation_point)
 		forward_normal_stag_up, forward_normal_stag_down = self.surface_normal(forward_stagnation_point[0])
 		aft_normal_stag_up, aft_normal_stag_down = self.surface_normal(aft_stagnation_point[0])
 		if forward_stagnation_point[1] < 0:
@@ -328,25 +332,30 @@ class Main:
 
 		# Set up the plot
 		plt.figure()
-		plt.plot(camber[0, :], camber[1, :], label='Camber', color='red')
+
 		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface', color='blue')
 		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface',color='blue')
 		plt.xlabel('X')
 		plt.ylabel('Y')
 		plt.title('Streamlines')
 		# Calculate the streamlines
-		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]+forward_normal_stag[0] * 1e-3, forward_stagnation_point[1]+forward_normal_stag[1] * 1e-3, -1*delta_s)
-		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]+aft_normal_stag[0] * 1e-3, aft_stagnation_point[1] + aft_normal_stag[1]*1e-3, delta_s)
+		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]+forward_normal_stag[0] * 1e-3, forward_stagnation_point[1]+forward_normal_stag[1] * 1e-3, -1*delta_s, self.x_geo, self.y_geo, self.gamma)
+		forward_stag_streamline = np.vstack(([forward_stagnation_point[0], forward_stagnation_point[1]], forward_stag_streamline))
+		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]+aft_normal_stag[0] * 1e-3, aft_stagnation_point[1] + aft_normal_stag[1]*1e-3, delta_s,  self.x_geo, self.y_geo, self.gamma)
+		aft_stag_streamline = np.vstack(([aft_stagnation_point[0], aft_stagnation_point[1]], aft_stag_streamline))
 		plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='black')
 		plt.plot(aft_stag_streamline[:, 0], aft_stag_streamline[:, 1],color='black')
 
 		for i in range(n_lines):
 			x = x_start
 			y = -delta_y * (i+1) + forward_stag_streamline[-1,1]
-			streamline = self.flow.streamlines(x, y, delta_s)
+			streamline = self.flow.streamlines(x, y, delta_s, self.x_geo, self.y_geo, self.gamma)
+			streamline = np.vstack(([x, y], streamline))
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
 			y = delta_y * (i+1) + forward_stag_streamline[-1,1]
-			streamline = self.flow.streamlines(x, y, delta_s)
+			streamline = self.flow.streamlines(x, y, delta_s, self.x_geo, self.y_geo, self.gamma)
+			streamline = np.vstack(([x, y], streamline))
+			streamline = np.column_stack((streamline, np.full(streamline.shape[0], x), np.full(streamline.shape[0], y)))
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
 		# plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
 		# plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
@@ -362,27 +371,29 @@ class Main:
 		"""
 		Executes the main logic of the application.
 		"""
+		alpha = 7.0
 		self.load_config()
 		self.setup_Geometry()
-		self.setup_vortex_pannel_method(0.0)
-		self.load_flow_field(0.0)
+		self.setup_vortex_pannel_method(alpha)
+		self.load_flow_field(alpha)
 
-		xcos = self.geometry.Cose_cluster(self.n_points)
+		self.xcos = self.geometry.Cose_cluster(self.n_points)
 		
-		x, y = self.geometry.generate_naca4_airfoil(self.NACA, xcos)
+		
+		self.x_geo, self.y_geo = self.geometry.generate_naca4_airfoil(self.NACA, self.xcos)
 
 		#list of alphas from start to end with increment
-		alpha = 0.0
-		CLs = []
-		Cmles = []
-		Cmc4s = []
+	
 		
 	
-		CL, Cmle, Cmc4, x_cp, y_cp, gamma = self.pannelmethod.run(x, y)
+		CL, Cmle, Cmc4, x_cp, y_cp, self.gamma = self.pannelmethod.run(self.x_geo, self.y_geo)
 
-		velocity = self.flow.flow_around_an_airfoil(-1, 0, x_cp, y_cp, gamma)
+		print("CL: ", CL)
+		print("Cmle: ", Cmle)	
+		print("Cmc4: ", Cmc4)
 
-		print(velocity)
+
+		self.plot(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
 		
 		
 		# plt.plot(alphas, CLs, label='CL')
