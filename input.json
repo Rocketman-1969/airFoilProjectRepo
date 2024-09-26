@@ -1,21 +1,25 @@
 {
     "geometry": {
+        "airfoil": "2412",
+        "airfoil_options": "xxxx = NACA 4-digit series, ULxx = Uniform Load (requires CL_design)",
+        "CL_design" : 0.2593304460915939,
+        "trailing_edge": "open",
+        "trailing_edge_options": "open = standard NACA 4-digit open trailing edge, closed = modified thickness to close trailing edge",
+        "n_points": 200,
         "x_leading_edge": 0.0,
         "x_trailing_edge": 1.0,
-        "NACA": "2410",
-        "n_points": 200,
         "chord_length": 1.0
     },
     "operating": {
         "freestream_velocity": 10.0,
-        "angle_of_attack": 0.0
+        "angle_of_attack": 15.0
     },
     "plot": {
         "x_start": -1.0,
         "x_lower_limit": -1.0,
         "x_upper_limit": 2.0,
         "delta_s": 0.01,
-        "n_lines": 15,
+        "n_lines": 5,
         "delta_y": 0.1
     }
 }

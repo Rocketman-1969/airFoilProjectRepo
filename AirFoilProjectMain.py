@@ -69,22 +69,24 @@ class Main:
 		self.delta_y = json_vals['plot']['delta_y']
 		self.free_stream_velocity = json_vals['operating']['freestream_velocity']
 		self.alpha = json_vals['operating']['angle_of_attack']
-		self.NACA = json_vals['geometry']['NACA']
+		self.NACA = json_vals['geometry']['airfoil']
+		self.CL_design = json_vals['geometry']['CL_design']
+		self.trailing_edge_options = json_vals['geometry']['trailing_edge']
 		self.chord = json_vals['geometry']['chord_length']
 		self.n_points = json_vals['geometry']['n_points']
 
-	def setup_vortex_pannel_method(self, alpha):
+	def setup_vortex_pannel_method(self):
 
-		self.pannelmethod = VortexPannelMethod(self.chord, self.free_stream_velocity, alpha)
+		self.pannelmethod = VortexPannelMethod(self.chord, self.free_stream_velocity, self.alpha)
 
 
 	def setup_Geometry(self):
 		"""
 		Initializes the Geometery object and calculates the camber, upper surface, and lower surface.
 		"""
-		self.geometry = GeometeryClass.Geometery(self.NACA, self.n_points)
+		self.geometry = GeometeryClass.Geometery(self.NACA, self.n_points, self.trailing_edge_options, self.CL_design)
 		
-	def load_flow_field(self, alpha):
+	def load_flow_field(self):
 		"""
 		Loads the flow field parameters.
 
@@ -92,7 +94,7 @@ class Main:
 		V_inf (float): The free stream velocity.
 		alpha (float): The angle of attack.
 		"""
-		self.flow = Flow.Flow(self.free_stream_velocity, alpha, self.x_low_val, self.x_up_val, self.pannelmethod)
+		self.flow = Flow.Flow(self.free_stream_velocity, self.alpha, self.x_low_val, self.x_up_val, self.pannelmethod)
 
 	def surface_tangent(self, x):
 		"""
@@ -216,7 +218,7 @@ class Main:
 
 		return forward_stagnation_point, aft_stagnation_point
 
-	def bisection_method(self,f, a, b, tol=1e-6, max_iter=100):
+	def bisection_method(self,f, a, b, tol=1e-10, max_iter=100):
 		"""
 		Bisection method to find the root of a function f(x) = 0.
 		
@@ -247,8 +249,8 @@ class Main:
 			c = (a + b) / 2
 			
 			# Check if the function value at the midpoint is close enough to zero
-			if abs(f(c)) < tol or (b - a) / 2 < tol:
-				print(f"Root found after {i+1} iterations: {c}")
+			if abs(f(c)) < tol:
+				print(f"Root found after {i+1} iterations: {f(c)}")
 				return c
 			
 			# Update the interval based on the sign of f(c)
@@ -260,9 +262,6 @@ class Main:
 		print("Warning: Maximum number of iterations reached.")
 		return None
     
-		# If max_iter is reached, return the last value
-		print("Maximum number of iterations reached.")
-		return x1, max_iter
 		
 	def plot(self, x_start, x_lower_limit, x_upper_limit, delta_s, n_lines, delta_y):
 		"""
@@ -344,8 +343,8 @@ class Main:
 		"""
 		self.load_config()
 		self.setup_Geometry()
-		self.setup_vortex_pannel_method(self.alpha)
-		self.load_flow_field(self.alpha)
+		self.setup_vortex_pannel_method()
+		self.load_flow_field()
 
 		self.xcos = self.geometry.Cose_cluster(self.n_points)
 		

@@ -28,6 +28,7 @@ class Flow:
     
     def unit_velocity(self, x_arb, y_arb, x_geo, y_geo, gamma):
         velocity = self.flow_around_an_airfoil(x_geo, y_geo, x_arb, y_arb, gamma)
+        velocity = velocity/np.linalg.norm(velocity)
         
         return velocity
     
