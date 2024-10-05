@@ -168,19 +168,62 @@ class Main:
 		tuple: A tuple containing the tangential velocity for the upper and lower surfaces.
 		"""
 		unit_tangent_upper, unit_tangent_lower = self.surface_tangent(x)
+		unit_normal_upper, unit_normal_lower = self.surface_normal(x)
 
 		x_geo,y_geo = self.geometry.generate_naca4_airfoil(self.NACA,self.xcos)
+		
 
 		if upper:
 			point, _ = self.geometry.generate_naca4_airfoil(self.NACA,x)
+			point[0] += 1e-5 * unit_normal_upper[0]
+			point[1] += 1e-5 * unit_normal_upper[1]
 			velocity = self.flow.flow_around_an_airfoil(x_geo, y_geo, point[0], point[1], self.gamma)
 			velocity_upper = np.dot(velocity, unit_tangent_upper)
 			return velocity_upper
 		else:
 			_, point = self.geometry.generate_naca4_airfoil(self.NACA, x)
+			point[0] += 1e-5 * unit_normal_lower[0]
+			point[1] += 1e-5 * unit_normal_lower[1]
 			velocity = self.flow.flow_around_an_airfoil(x_geo, y_geo, point[0], point[1], self.gamma)
 			velocity_lower = np.dot(velocity, unit_tangent_lower)	
 			return velocity_lower
+
+	def surface_Cp(self, xcp, ycp):
+		"""
+		Calculate the pressure coefficient at a given x-coordinate.
+
+		Parameters:
+		x (float): The x-coordinate at which to calculate the pressure coefficient.
+
+		Returns:
+		tuple: A tuple containing the pressure coefficient for the upper and lower surfaces.
+		"""
+		Cp = []
+
+		for i in range(len(xcp)):
+
+			dx = self.x_geo[i+1] - self.x_geo[i]
+			dy = self.y_geo[i+1] - self.y_geo[i]
+			
+			tangent = np.array([dx, dy])
+			tangent = tangent / np.linalg.norm(tangent)
+
+			normal = np.array([tangent[1], -tangent[0]])
+	
+	
+			pointx = xcp[i] + 1e-5 * normal[0]
+			pointy = ycp[i] + 1e-5 * normal[1]
+
+			print()
+			velocity = self.flow.flow_around_an_airfoil(self.x_geo, self.y_geo, pointx, pointy, self.gamma)
+			print("Velocity Vector: ", velocity)
+			velocity = np.linalg.norm(velocity)
+			print("Velocity: ", velocity)
+			Cptemp = 1 - (velocity / self.free_stream_velocity) ** 2
+			Cp.append(Cptemp)
+
+		return Cp
+
 
 
 	
@@ -332,7 +375,7 @@ class Main:
 
 
 		plt.xlim(x_lower_limit, x_upper_limit)
-		plt.ylim(x_lower_limit, x_upper_limit)
+		plt.ylim(-0.5, 0.5)
 		plt.gca().set_aspect('equal', adjustable='box')
 		plt.show()
 
@@ -351,6 +394,9 @@ class Main:
 		
 		self.x_geo, self.y_geo = self.geometry.generate_naca4_airfoil(self.NACA, self.xcos)
 
+		print("X: ", self.x_geo)
+		print("Y: ", self.y_geo)
+
 		#list of alphas from start to end with increment
 	
 		
@@ -360,9 +406,16 @@ class Main:
 		print("CL: ", CL)
 		print("Cmle: ", Cmle)	
 		print("Cmc4: ", Cmc4)
+		print("Gamma: ", self.gamma)
+
+		Cp = self.surface_Cp(x_cp, y_cp)
+		
+		plt.plot(x_cp, Cp, label='Cp Upper')
+		plt.ylim(plt.ylim()[::-1])
+		plt.show()
 
 
-		self.plot(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
+		#self.plot(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
 		
 		
 		# plt.plot(alphas, CLs, label='CL')

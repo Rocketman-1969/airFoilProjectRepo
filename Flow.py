@@ -45,7 +45,7 @@ class Flow:
         """
         streamline = []
         iter = 0
-        point=[x, y]
+        
         while True:
             k1 = delta_s * self.unit_velocity(x, y, x_geo, y_geo, gamma)
             k2 = delta_s * self.unit_velocity(x + 0.5*k1[0], y + 0.5*k1[1], x_geo, y_geo, gamma)

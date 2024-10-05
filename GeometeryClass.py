@@ -78,14 +78,12 @@ class Geometery:
             yt = 5 * t * (0.2969 * np.sqrt(x) - 0.1260 * x - 0.3516 * x**2 + 0.2843 * x**3 - 0.1015 * x**4)
         
         elif self.TEOption == "closed":
-            yt = t * (2.980 * np.sqrt(x) - 1.320 * x - 3.286 * x**2 + 2.441 * x**3 - 0.815 * x**4)
+            yt = t/2 * (2.980 * np.sqrt(x) - 1.320 * x - 3.286 * x**2 + 2.441 * x**3 - 0.815 * x**4)
         
         else:
             raise ValueError("Invalid trailing edge option. Must be 'open' or 'closed'.")
         
         
-
-       
         # Angle of the camber line
         theta = np.arctan(dyc_dx)
 
