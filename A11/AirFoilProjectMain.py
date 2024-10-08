@@ -390,6 +390,6 @@ class Main:
 		# plt.show()
 
 if __name__ == "__main__":
-	main = Main('input.json')
+	main = Main('A11/a11_input.json')
 	main.run()
 		

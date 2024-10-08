@@ -106,4 +106,4 @@ class Geometery:
             x_coords = np.concatenate([xu[::-1], xl])
             y_coords = np.concatenate([yu[::-1], yl])
 
-        return x_coords, y_coords
+        return x_coords, y_coords, yc

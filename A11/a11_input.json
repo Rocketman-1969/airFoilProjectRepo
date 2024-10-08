@@ -1,0 +1,17 @@
+{
+    "plot": {
+        "x_lower_limit": -10.0,
+        "x_upper_limit": 10.0,
+        "x_start": -1.95,
+        "y_start": 5.0,
+        "n_lines" : 0,
+        "delta_s": 0.01,
+        "delta_y": 0.2
+    },
+    "elements": {
+        "1":  {"type": "vortex", "x": -2.0, "y":  5.0, "gamma":   10.0},
+        "2":  {"type": "source", "x": -2.0, "y":  5.0, "lambda":  0.2},
+        "3":  {"type": "vortex", "x":  2.0, "y":  5.0, "gamma":  10.0},
+        "4":  {"type": "doublet","x":  6.0, "y":  5.0, "kappa": 10.0, "alpha": -90.0}
+    }
+}
