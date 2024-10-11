@@ -1,0 +1,33 @@
+{
+    "geometry": {
+        "airfoil": "2412",
+        "CL_design": 0.5,
+        "xfilename": "myairfoil.txt",
+        "trailing_edge": "closed",
+        "n_points": 200
+    },
+    "operating": {
+        "freestream_velocity": 10.0,
+        "alpha[deg]": 6.0
+    },
+    "alpha_sweep": {
+        "output_file": "alpha_sweep.csv",
+        "start[deg]": -12.0,
+        "end[deg]": 16.0,
+        "increment[deg]": 2.0
+    },
+    "plot_options": {
+        "x_start": -1.0,
+        "x_lower_limit": -1.0,
+        "x_upper_limit": 2.0,
+        "delta_s": 0.01,
+        "n_lines": 5,
+        "delta_y": 0.1
+    },
+    "run_commands": {
+        "plot_streamlines": true,
+        "plot_pressure": true,
+        "alpha_sweep": true,
+        "export_geometry": false
+    }
+}

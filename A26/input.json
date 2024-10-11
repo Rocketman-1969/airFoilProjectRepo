@@ -1,9 +1,9 @@
 {
     "geometry" : {
-        "airfoil" : "2417",
+        "airfoil" : "2412",
         "airfoil_options" : "xxxx = NACA 4-digit series,ULxx = Uniform Load (requires CL_design),file = read airfoil from file (requires filename)",
         "CL_design" : 0.2593304460915939,
-        "filename" : "2417_Geometry.txt",
+        "xfilename" : "2417_Geometry.txt",
         "trailing_edge" : "closed",
         "trailing_edge_options" : "open = standard NACA 4-digit open trailing edge,closed = modified thickness to close trailing edge",
         "n_points" : 200
@@ -13,9 +13,9 @@
         "alpha[deg]" : 0.0
     },
     "alpha_sweep" : {
-        "start[deg]" : -5.0,
-        "end[deg]" : 5.0,
-        "increment[deg]" : 5.0
+        "start[deg]" : -12.0,
+        "end[deg]" : 16.0,
+        "increment[deg]" : 2.0
     },
     "plot_options" : {
         "x_start" : -1.0,
@@ -26,9 +26,9 @@
         "delta_y" : 0.1
     },
     "run_commands" : {
-        "plot_streamlines" : true,
-        "plot_pressure" : true,
+        "plot_streamlines" : false,
+        "plot_pressure" : false,
         "alpha_sweep" : false,
-        "export_geometry" : true
+        "export_geometry" : false
     }
 }
