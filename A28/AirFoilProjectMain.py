@@ -58,8 +58,7 @@ class Main:
 		with open(self.config_file, 'r') as file:
 			json_vals = json.load(file)
 		self.radius = json_vals['geometry']['cylinder_radius']
-		self.epsilon = json_vals['geometry']['epsilon']
-		self.z0 = [0,0]
+		self.z0 = json_vals['geometry']['z0']
 
 		self.free_stream_velocity = json_vals['operating']['freestream_velocity']
 		self.angle_of_attack = json_vals['operating']['angle_of_attack[deg]']
@@ -81,7 +80,7 @@ class Main:
 		"""
 		Initializes the Geometery object and calculates the camber, upper surface, and lower surface.
 		"""
-		self.geometry = GeometeryClass.Geometery(self.radius, self.z0, self.epsilon)
+		self.geometry = GeometeryClass.Geometery(self.radius, self.z0)
 		
 	def load_flow_field(self, V_inf, alpha):
 		"""
@@ -91,7 +90,7 @@ class Main:
 		V_inf (float): The free stream velocity.
 		alpha (float): The angle of attack.
 		"""
-		self.flow = Flow.Flow(self.radius, V_inf, alpha, self.x_low_val, self.x_up_val, self.epsilon, self.gamma , self.z0)
+		self.flow = Flow.Flow(self.radius, V_inf, alpha, self.x_low_val, self.x_up_val, self.gamma, self.z0)
 
 	def surface_tangent(self, x):
 		"""
@@ -109,20 +108,20 @@ class Main:
         # Interpolate to find the y-coordinate at x
 		#Trailing Edge Case
 		if np.abs(x-self.TE) < delta:
-			_, y_upper_minus, y_lower_minus = self.geometry.geometery_zplane(x-delta)
+			_, y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
 			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), -1*(y_upper_minus[1]-y_lower_minus[1])])
 			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), -1*(y_upper_minus[1]-y_lower_minus[1])])
 		#Leading Edge Case	
 		elif np.abs(x-self.LE) < delta:
-			_,y_upper_plus, y_lower_plus = self.geometry.geometery_zplane(x+delta)
+			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
 			tangent_upper = np.array([-1*np.abs(y_upper_plus[0]-y_upper_plus[0]), y_upper_plus[1]-y_lower_plus[1]])
 			tangent_lower = np.array([-1*np.abs(y_upper_plus[0]-y_upper_plus[0]), y_upper_plus[1]-y_lower_plus[1]])
 		#General Case
 		else:
-			_,y_upper_plus, y_lower_plus = self.geometry.geometery_zplane(x+delta)
+			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
-			_,y_upper_minus, y_lower_minus = self.geometry.geometery_zplane(x-delta)
+			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
 
 			tangent_upper = np.array([np.abs(y_upper_plus[0]-y_upper_minus[0]), y_upper_plus[1] - y_upper_minus[1]])
 			tangent_lower = np.array([-1 * np.abs(y_lower_plus[0]-y_lower_minus[0]), -1*(y_lower_plus[1] - y_lower_minus[1])])
@@ -151,14 +150,14 @@ class Main:
 
         # Interpolate to find the y-coordinate at x
 		if np.abs(x-self.radius) < delta:
-			_,y_upper_minus, y_lower_minus = self.geometry.geometery_zplane(x-delta)
+			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
 			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_minus[1]-y_lower_minus[1]])
 			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_minus[1]-y_lower_minus[1]])
 
 			normal_upper = np.array([tangent_upper[1], tangent_upper[0]])
 			normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])		
 		elif np.abs(x+self.radius) < delta:
-			_,y_upper_plus, y_lower_plus = self.geometry.geometery_zplane(x+delta)
+			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
 			tangent_upper = np.array([-1 * np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1]-y_lower_plus[1]])
 			tangent_lower = np.array([-1 * np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1]-y_lower_plus[1]])
@@ -166,9 +165,9 @@ class Main:
 			normal_upper = np.array([-tangent_upper[1], tangent_upper[0]])
 			normal_lower = np.array([-tangent_lower[1], -tangent_lower[0]]) 
 		else:
-			_,y_upper_plus, y_lower_plus = self.geometry.geometery_zplane(x+delta)
+			_,y_upper_plus, y_lower_plus = self.geometry.circle(x+delta)
 
-			_,y_upper_minus, y_lower_minus = self.geometry.geometery_zplane(x-delta)
+			_,y_upper_minus, y_lower_minus = self.geometry.circle(x-delta)
 
 			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1] - y_upper_minus[1]])
 			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), (y_lower_plus[1] - y_lower_minus[1])])
@@ -195,12 +194,12 @@ class Main:
 		unit_tangent_upper, unit_tangent_lower = self.surface_tangent(x)
 
 		if upper:
-			_, point, _ = self.geometry.geometery_zplane(x)
-			velocity_upper = np.dot(self.flow.flow_over_eleptic_cylinder(point[0], point[1]), unit_tangent_upper)
+			_, point, _ = self.geometry.circle(x)
+			velocity_upper = np.dot(self.flow.flow_over_cylinder_complex(point[0], point[1]), unit_tangent_upper)
 			return velocity_upper
 		else:
-			_, _, point = self.geometry.geometery_zplane(x)
-			velocity = self.flow.flow_over_eleptic_cylinder(point[0], point[1])
+			_, _, point = self.geometry.circle(x)
+			velocity = self.flow.flow_over_cylinder_complex(point[0], point[1])
 			velocity_lower = np.dot(velocity, unit_tangent_lower)
 			return velocity_lower
 
@@ -225,18 +224,16 @@ class Main:
                 # Use upper surface
 				upper_flag = True
 				def velocity_function(x):
-					v = self.surface_tangential_velocity(x, upper=upper_flag)
-					return v
+					return self.surface_tangential_velocity(x, upper=upper_flag)
 				x_stag = self.bisection_method(velocity_function, self.LE, self.TE-self.radius)
-				_, forward_stagnation_point, _ = self.geometry.geometery_zplane(x_stag)
+				_, forward_stagnation_point, _ = self.geometry.circle(x_stag)
 			else:
                 # Use lower surface
 				upper_flag = False
 				def velocity_function(x):
-					v = self.surface_tangential_velocity(x, upper=upper_flag)
-					return v
+					return self.surface_tangential_velocity(x, upper=upper_flag)
 				x_stag = self.bisection_method(velocity_function, self.LE, self.TE-self.radius)
-				_, _, forward_stagnation_point = self.geometry.geometery_zplane(x_stag)
+				_, _, forward_stagnation_point = self.geometry.circle(x_stag)
 
 		if np.abs(velocity_TE) < epsilon:
 			aft_stagnation_point = [self.TE, self.z0[1]]
@@ -245,18 +242,16 @@ class Main:
                 # Use lower surface
 				upper_flag = False
 				def velocity_function(x):
-					v = self.surface_tangential_velocity(x, upper=upper_flag)
-					return v
+					return self.surface_tangential_velocity(x, upper=upper_flag)
 				x_stag = self.bisection_method(velocity_function, self.LE+self.radius, self.TE)
-				_, _, aft_stagnation_point = self.geometry.geometery_zplane(x_stag)
+				_, _, aft_stagnation_point = self.geometry.circle(x_stag)
 			else:
                 # Use upper surface
 				upper_flag = True
 				def velocity_function(x):
-					v = self.surface_tangential_velocity(x, upper=upper_flag)
-					return v
+					return self.surface_tangential_velocity(x, upper=upper_flag)
 				x_stag = self.bisection_method(velocity_function, self.LE+self.radius, self.TE)
-				_, aft_stagnation_point, _ = self.geometry.geometery_zplane(x_stag)
+				_, aft_stagnation_point, _ = self.geometry.circle(x_stag)
 
 		return forward_stagnation_point, aft_stagnation_point
 	
@@ -324,28 +319,13 @@ class Main:
 		lower_surface = np.empty((2, 0))
 
 		for i in range(len(x)):
-			camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.geometery_zeta(x[i])
+			camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.circle(x[i])
 
 			# Append the new values to the arrays
 			camber = np.hstack((camber, camber_temp.reshape(2, 1)))
 			upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
 			lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
 
-		print(upper_surface)
-
-		camber_z = np.empty((2, 0))
-		upper_surface_z = np.empty((2, 0))
-		lower_surface_z = np.empty((2, 0))
-		
-		for i in range(len(x)):
-			camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.geometery_zplane(x[i])
-
-			# Append the new values to the arrays
-			camber_z = np.hstack((camber_z, camber_temp.reshape(2, 1)))
-			upper_surface_z = np.hstack((upper_surface_z, upper_surface_temp.reshape(2, 1)))
-			lower_surface_z = np.hstack((lower_surface_z, lower_surface_temp.reshape(2, 1)))
-							 
-		print(upper_surface_z)
 		#calculate stagnation points
 		forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
 		forward_normal_stag_up, forward_normal_stag_down = self.surface_normal(forward_stagnation_point[0])
@@ -358,24 +338,18 @@ class Main:
 			aft_normal_stag = aft_normal_stag_down
 		else:
 			aft_normal_stag = aft_normal_stag_up
-		
-		print("Forward Stagnation Point: ", forward_stagnation_point)
-		print("Aft Stagnation Point: ", aft_stagnation_point)
 
 		# Set up the plot
 		plt.figure()
 		plt.plot(camber[0, :], camber[1, :], label='Camber', color='red')
-		plt.plot(camber_z[0, :], camber_z[1, :], label='Camber', color='red')
-		plt.plot(upper_surface_z[0, :], upper_surface_z[1, :], label='Upper Surface', color='yellow')
-		plt.plot(lower_surface_z[0, :], lower_surface_z[1, :], label='Lower Surface',color='black')
 		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface', color='blue')
 		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface',color='blue')
 		plt.xlabel('X')
 		plt.ylabel('Y')
 		plt.title('Streamlines')
 		# Calculate the streamlines
-		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]+.01, forward_stagnation_point[1]-.01, -1*delta_s)
-		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]-.01, aft_stagnation_point[1]-.01, delta_s)
+		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]+forward_normal_stag[0] * 1e-3, forward_stagnation_point[1]+forward_normal_stag[1] * 1e-3, -1*delta_s)
+		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]+aft_normal_stag[0] * 1e-3, aft_stagnation_point[1] + aft_normal_stag[1]*1e-3, delta_s)
 		plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='black')
 		plt.plot(aft_stag_streamline[:, 0], aft_stag_streamline[:, 1],color='black')
 
@@ -387,9 +361,8 @@ class Main:
 			y = delta_y * (i+1) + forward_stag_streamline[-1,1]
 			streamline = self.flow.streamlines(x, y, delta_s)
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
-
-		plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
-		plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
+		# plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
+		# plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
 
 
 		plt.xlim(x_lower_limit, x_upper_limit)
