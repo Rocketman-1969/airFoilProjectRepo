@@ -59,7 +59,7 @@ class Main:
 			json_vals = json.load(file)
 		self.radius = json_vals['geometry']['cylinder_radius']
 		self.epsilon = json_vals['geometry']['epsilon']
-		self.z0 = json_vals['geometry']['zeta_0']
+		self.z0 = [0,0]
 
 		self.free_stream_velocity = json_vals['operating']['freestream_velocity']
 		self.angle_of_attack = json_vals['operating']['angle_of_attack[deg]']
@@ -423,8 +423,6 @@ class Main:
 
 		plt.xlim(x_lower_limit, x_upper_limit)
 		plt.ylim(x_lower_limit, x_upper_limit)
-		plt.axhline(0, color='black',linewidth=1) 
-		plt.axvline(0, color='black',linewidth=1)
 		plt.xlabel('X')
 		plt.ylabel('Y')
 		plt.title('Streamlines')
@@ -442,6 +440,59 @@ class Main:
 
 		self.plot(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
 
+		# streamlines_upper = self.flow.streamlines(-4.5,-.25,0.01)
+
+		# plt.plot(streamlines_upper[:,0], streamlines_upper[:,1],label='Streamlines Upper')
+		# plt.show()
+		# forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
+		# print("Forward Stagnation Point: ", forward_stagnation_point)
+		# print("Aft Stagnation Point: ", aft_stagnation_point)
+
+		
+
+		# x = np.linspace(-1 * self.radius, self.radius, 1000)
+		# camber = np.empty((2, 0))
+		# upper_surface = np.empty((2, 0))
+		# lower_surface = np.empty((2, 0))
+
+		# for i in range(len(x)):
+		# 	camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.circle(x[i])
+
+		# 	# Append the new values to the arrays
+		# 	camber = np.hstack((camber, camber_temp.reshape(2, 1)))
+		# 	upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
+		# 	lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
+
+
+		# x_coord = 2
+		# _,point,_ = self.geometry.circle(x_coord)
+		# y_coord = point[1]
+		# tangent_upper, tangent_lower = self.surface_tangent(x_coord)
+		# normal_upper, normal_lower = self.surface_normal(x_coord)
+
+		
+
+		# print("tangent_upper: ", tangent_upper)
+		# print("tangent_lower: ", tangent_lower)
+		# print("normal_upper: ", normal_upper)
+		# print("normal_lower: ", normal_lower)
+
+		# # Plotting the results
+		# plt.figure()
+		# plt.plot(camber[0, :], camber[1, :], label='Camber')
+		# plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface')
+		# plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface')
+		# # Plot tangent and normal vectors
+
+		# plt.quiver(x_coord, y_coord, tangent_upper[0], tangent_upper[1], color='green', scale=10, label='Tangent Upper')
+		# plt.quiver(x_coord, y_coord, normal_upper[0], normal_upper[1], color='purple', scale=10, label='Normal Upper')
+		# plt.quiver(x_coord, -y_coord, tangent_lower[0], tangent_lower[1], color='red', scale=10, label='Tangent Lower')
+		# plt.quiver(x_coord, -y_coord, normal_lower[0], normal_lower[1], color='yellow', scale=10, label='Normal Lower')
+		# plt.legend(loc='upper right')
+		# plt.xlabel('X')
+		# plt.ylabel('Y')
+		# plt.title('Airfoil Geometry')
+		# plt.show()
 
 if __name__ == "__main__":
 	main = Main('input.json')
