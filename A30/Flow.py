@@ -146,5 +146,6 @@ class Flow:
             
             if x_new < self.x_low_val or x_new > self.x_up_val:
                 break
+        print("im alive and working calm down i just take for ever")
             
         return np.array(streamline)

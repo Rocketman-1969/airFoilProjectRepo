@@ -58,11 +58,8 @@ class Main:
 		with open(self.config_file, 'r') as file:
 			json_vals = json.load(file)
 		self.radius = json_vals['geometry']['cylinder_radius']
-		self.type = json_vals['geometry']['type']
 		self.epsilon = json_vals['geometry']['epsilon']
 		self.z0 = json_vals['geometry']['zeta_0']
-		self.design_CL = json_vals['geometry']['design_CL']
-		self.design_thickness = json_vals['geometry']['design_thickness']
 
 		self.free_stream_velocity = json_vals['operating']['freestream_velocity']
 		self.angle_of_attack = json_vals['operating']['angle_of_attack[deg]']
@@ -75,27 +72,15 @@ class Main:
 		self.n_lines = json_vals['plot']['n_lines']
 		self.delta_y = json_vals['plot']['delta_y']
 
-		self.LE = -1*self.radius + self.z0[0]
+		self.LE = -1 * self.radius+ self.z0[0]
 		self.TE = self.radius + self.z0[0]
+		
+
 
 	def setup_Geometry(self):
 		"""
 		Initializes the Geometery object and calculates the camber, upper surface, and lower surface.
 		"""
-		if self.type == 'airfoil':
-			alpha = np.deg2rad(self.angle_of_attack)
-			V_inf = self.free_stream_velocity
-			x0 = (self.design_thickness * -4 / (3 * np.sqrt(3))) * self.radius
-			y0 = self.design_CL * self.radius / (2*np.pi*(1+(4*self.design_thickness/(3*np.sqrt(3)))))
-
-			self.epsilon = self.radius - np.sqrt(self.radius**2 - y0**2) - x0
-
-			self.z0 = [x0, y0]
-			
-			self.LE = -1 * np.sqrt(self.radius**2 - y0**2) + x0
-			self.TE = np.sqrt(self.radius**2 - y0**2) + x0
-			self.gamma = 4*np.pi*V_inf*(np.sqrt(self.radius**2 - y0**2)*np.sin(alpha) + y0*np.cos(alpha))
-
 		self.geometry = GeometeryClass.Geometery(self.radius, self.z0, self.epsilon)
 		
 	def load_flow_field(self, V_inf, alpha):
@@ -230,7 +215,6 @@ class Main:
 		epsilon = 1e-5  # Small perturbation for numerical differentiation
 
         # Check leading edge (LE) and trailing edge (TE)
-		
 		velocity_LE = self.surface_tangential_velocity(self.LE)
 		velocity_TE = self.surface_tangential_velocity(self.TE, upper=False)
 
@@ -253,33 +237,30 @@ class Main:
 					return v
 				x_stag = self.bisection_method(velocity_function, self.LE, self.TE-self.radius)
 				_, _, forward_stagnation_point = self.geometry.geometery_zplane(x_stag)
-		
-		if self.type == 'airfoil':
-			_, aft_stagnation_point, _ = self.geometry.geometery_zplane(self.TE)
+
+		if np.abs(velocity_TE) < epsilon:
+			aft_stagnation_point = [self.TE, self.z0[1]]
 		else:
-			if np.abs(velocity_TE) < epsilon:
-				aft_stagnation_point = [self.TE, self.z0[1]]
+			if velocity_TE > 0:
+                # Use lower surface
+				upper_flag = False
+				def velocity_function(x):
+					v = self.surface_tangential_velocity(x, upper=upper_flag)
+					return v
+				x_stag = self.bisection_method(velocity_function, self.LE+self.radius, self.TE)
+				_, _, aft_stagnation_point = self.geometry.geometery_zplane(x_stag)
 			else:
-				if velocity_TE > 0:
-					# Use lower surface
-					upper_flag = False
-					def velocity_function(x):
-						v = self.surface_tangential_velocity(x, upper=upper_flag)
-						return v
-					x_stag = self.bisection_method(velocity_function, self.LE+self.radius, self.TE)
-					_, _, aft_stagnation_point = self.geometry.geometery_zplane(x_stag)
-				else:
-					# Use upper surface
-					upper_flag = True
-					def velocity_function(x):
-						v = self.surface_tangential_velocity(x, upper=upper_flag)
-						return v
-					x_stag = self.bisection_method(velocity_function, self.LE+self.radius, self.TE)
-					_, aft_stagnation_point, _ = self.geometry.geometery_zplane(x_stag)
-		
+                # Use upper surface
+				upper_flag = True
+				def velocity_function(x):
+					v = self.surface_tangential_velocity(x, upper=upper_flag)
+					return v
+				x_stag = self.bisection_method(velocity_function, self.LE+self.radius, self.TE)
+				_, aft_stagnation_point, _ = self.geometry.geometery_zplane(x_stag)
+
 		return forward_stagnation_point, aft_stagnation_point
 	
-	def bisection_method(self,f, a, b, tol=1e-10, max_iter=1000):
+	def bisection_method(self,f, a, b, tol=1e-10, max_iter=100):
 		"""
 		Bisection method to find the root of a function f(x) = 0.
 		
@@ -302,7 +283,7 @@ class Main:
 		
 		# Check if a root is guaranteed in the initial interval
 		if f(a) * f(b) >= 0:
-			
+			print(f(a), f(b))
 			print("Bisection method fails. The function must have different signs at the endpoints.")
 			return None
 		
@@ -322,7 +303,7 @@ class Main:
 				a = c  # Root is in the right half
 		
 		print("Warning: Maximum number of iterations reached.")
-		return c
+		return None
 
 	def z_2_zeta(self, z):
 		z = z[0] + 1j * z[1]
@@ -363,7 +344,7 @@ class Main:
 		n_lines (int): The number of streamlines to plot.
 		delta_y (float): The spacing between streamlines.
 		"""
-		x = np.linspace(self.LE, self.TE, 10000)
+		x = np.linspace(self.LE, self.TE, 1000)
 		camber = np.empty((2, 0))
 		upper_surface = np.empty((2, 0))
 		lower_surface = np.empty((2, 0))
@@ -376,7 +357,7 @@ class Main:
 			upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
 			lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
 
-		
+		print(upper_surface)
 
 		camber_z = np.empty((2, 0))
 		upper_surface_z = np.empty((2, 0))
@@ -390,7 +371,7 @@ class Main:
 			upper_surface_z = np.hstack((upper_surface_z, upper_surface_temp.reshape(2, 1)))
 			lower_surface_z = np.hstack((lower_surface_z, lower_surface_temp.reshape(2, 1)))
 							 
-		
+		print(upper_surface_z)
 		#calculate stagnation points
 		forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
 		forward_stag_point_zeta = self.z_2_zeta(forward_stagnation_point)
@@ -450,18 +431,6 @@ class Main:
 		plt.gca().set_aspect('equal', adjustable='box')
 		plt.show()
 
-	def get_coefficients(self):
-		alpha = np.deg2rad(self.angle_of_attack)
-		x0 = self.z0[0]
-		y0 = self.z0[1]
-		CL = 2*np.pi*((np.sin(alpha) + y0*np.cos(alpha)/np.sqrt(self.radius**2-y0**2))/(1+x0/(np.sqrt(self.radius**2-y0**2)-x0)))
-		Cm0 = (np.pi/4)*((self.radius**2-y0**2-x0**2)/(self.radius**2-y0**2))**2*np.sin(2*alpha)-(1/4)*CL*((x0*np.cos(alpha)+y0*np.sin(alpha))/(self.radius**2-y0**2))*(np.sqrt(self.radius**2-y0**2)-x0)
-		zt = 2*(np.sqrt(self.radius**2 - y0**2) + x0)
-		zl = -2*(self.radius**2 - y0**2 + x0**2) / (np.sqrt(self.radius**2 - y0**2) - x0)
-		Zc4 = zl + 0.25*(zt-zl)
-		Cm4 = Cm0 + CL*(Zc4*np.cos(alpha)+0*np.sin(alpha))/(zt-zl)
-
-		return CL, Cm0, Cm4
 
 	def run(self):
 		"""
@@ -470,13 +439,6 @@ class Main:
 		self.load_config()
 		self.setup_Geometry()
 		self.load_flow_field(self.free_stream_velocity, self.angle_of_attack)
-
-		if self.type == 'airfoil':
-			CL, Cm0, Cm4 = self.get_coefficients()
-			print("CL: ", CL)
-			print("Cm0: ", Cm0)
-			print("Cm4: ", Cm4)
-
 
 		self.plot(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
 

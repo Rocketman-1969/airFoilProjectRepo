@@ -1,13 +1,8 @@
 {
     "geometry" : {
         "cylinder_radius" : 2.0,
-        "type" : "airfoil",
-        "type_options" :
-            "cylinder = Joukowski cylinder (requires epsilon, zeta_0, vortex_strength), airfoil = Joukowski airfoil (requires design_CL and design_thickness)",
         "epsilon" : 0.8,
-        "zeta_0" : [-0.5, 0.5],
-        "design_CL" : 0.261,
-        "design_thickness" : 0.12
+        "zeta_0" : [-0.5, 0.5]
     },
     "operating" : {
         "freestream_velocity" : 10.0,
@@ -23,3 +18,4 @@
         "delta_y" : 0.4
     }
 }
+    
