@@ -305,6 +305,32 @@ class Main:
 		print("Warning: Maximum number of iterations reached.")
 		return None
 
+	def z_2_zeta(self, z):
+		z = z[0] + 1j * z[1]
+		z1 = z**2 - 4 * (self.radius - self.epsilon) ** 2
+		z0 = self.z0[0] + 1j * self.z0[1]
+
+		if np.real(z1) > 0:
+			zeta_1 = (z + np.sqrt(z1)) / 2
+			zeta_2 = (z - np.sqrt(z1)) / 2
+		elif np.real(z1) < 0:
+			zeta_1 = (z - 1j * np.sqrt(-z1)) / 2
+			zeta_2 = (z + 1j * np.sqrt(-z1)) / 2
+		elif np.imag(z1) > 0:
+			zeta_1 = (z + np.sqrt(z1)) / 2
+			zeta_2 = (z - np.sqrt(z1)) / 2
+		else:
+			zeta_1 = (z - 1j * np.sqrt(-z1)) / 2
+			zeta_2 = (z + 1j * np.sqrt(-z1)) / 2
+
+		if abs(zeta_2 - z0) > abs(zeta_1 - z0):
+			zeta = zeta_2
+		else:
+			zeta = zeta_1
+		
+		zeta = np.array([zeta.real, zeta.imag])
+
+		return zeta
 
 	def plot(self, x_start, x_lower_limit, x_upper_limit, delta_s, n_lines, delta_y):
 		"""
@@ -348,12 +374,16 @@ class Main:
 		print(upper_surface_z)
 		#calculate stagnation points
 		forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
-		forward_normal_stag_up, forward_normal_stag_down = self.surface_normal(forward_stagnation_point[0])
-		aft_normal_stag_up, aft_normal_stag_down = self.surface_normal(aft_stagnation_point[0])
+		forward_stag_point_zeta = self.z_2_zeta(forward_stagnation_point)
+		aft_stag_point_zeta = self.z_2_zeta(aft_stagnation_point)
+		forward_normal_stag_up, forward_normal_stag_down = self.surface_normal(forward_stag_point_zeta[0])
+		aft_normal_stag_up, aft_normal_stag_down = self.surface_normal(aft_stag_point_zeta[0])
+
 		if forward_stagnation_point[1] < 0:
 			forward_normal_stag = forward_normal_stag_down
 		else:
 			forward_normal_stag = forward_normal_stag_up
+
 		if aft_stagnation_point[1] < 0:
 			aft_normal_stag = aft_normal_stag_down
 		else:
@@ -364,18 +394,20 @@ class Main:
 
 		# Set up the plot
 		plt.figure()
-		plt.plot(camber[0, :], camber[1, :], label='Camber', color='red')
-		plt.plot(camber_z[0, :], camber_z[1, :], label='Camber', color='red')
-		plt.plot(upper_surface_z[0, :], upper_surface_z[1, :], label='Upper Surface', color='yellow')
-		plt.plot(lower_surface_z[0, :], lower_surface_z[1, :], label='Lower Surface',color='black')
-		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface', color='blue')
-		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface',color='blue')
-		plt.xlabel('X')
-		plt.ylabel('Y')
-		plt.title('Streamlines')
+		plt.plot(camber_z[0, :], camber_z[1, :], label='Camber', color='blue')
+		plt.plot(upper_surface_z[0, :], upper_surface_z[1, :], label='Upper Surface', color='blue')
+		plt.plot(lower_surface_z[0, :], lower_surface_z[1, :], label='Lower Surface',color='blue')
+		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface', color='red', linestyle='--')
+		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface',color='red', linestyle='--')
+		plt.plot(self.z0[0], self.z0[1], label='Center of Circle', color='red', marker='o', markerfacecolor='none')
+		plt.plot((self.radius-self.epsilon), 0, label='zeta stag point', color='red', marker='.')
+		plt.plot(-1*(self.radius-self.epsilon), 0, label='zeta stag point', color='red', marker='.')
+		plt.plot(2*(self.radius-self.epsilon), 0, label='zeta stag point', color='blue', marker='.')
+		plt.plot(-2*(self.radius-self.epsilon), 0, label='zeta stag point', color='blue', marker='.')
+		
 		# Calculate the streamlines
-		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]+.01, forward_stagnation_point[1]-.01, -1*delta_s)
-		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]-.01, aft_stagnation_point[1]-.01, delta_s)
+		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0] + 1e-6*forward_normal_stag[0], forward_stagnation_point[1] + 1e-6*forward_normal_stag[1], -1*delta_s)
+		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0] + 1e-6*aft_normal_stag[0], aft_stagnation_point[1] + 1e-6*aft_normal_stag[1], delta_s)
 		plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='black')
 		plt.plot(aft_stag_streamline[:, 0], aft_stag_streamline[:, 1],color='black')
 
@@ -388,12 +420,12 @@ class Main:
 			streamline = self.flow.streamlines(x, y, delta_s)
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
 
-		plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
-		plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
-
 
 		plt.xlim(x_lower_limit, x_upper_limit)
 		plt.ylim(x_lower_limit, x_upper_limit)
+		plt.xlabel('X')
+		plt.ylabel('Y')
+		plt.title('Streamlines')
 		plt.gca().set_aspect('equal', adjustable='box')
 		plt.show()
 
