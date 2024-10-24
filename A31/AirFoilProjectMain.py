@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import json
 import GeometeryClass
 import Flow
-from VortexPannelMethod import VortexPannelMethod
+from scipy.optimize import newton
 
 
 class Main:
@@ -49,7 +49,7 @@ class Main:
 			The path to the configuration file.
 		"""
 		self.config_file = config_file
-	
+		
 	def load_config(self):
 		"""
 		Loads the configuration from the JSON file.
@@ -107,10 +107,6 @@ class Main:
 		alpha (float): The angle of attack.
 		"""
 		self.flow = Flow.Flow(self.radius, V_inf, alpha, self.x_low_val, self.x_up_val, self.epsilon, self.gamma , self.z0)
-	
-	def setup_vortex_pannel_method(self, alpha):
-
-			self.pannelmethod = VortexPannelMethod(1.0, self.free_stream_velocity, alpha)
 
 	def surface_tangent(self, x):
 		"""
@@ -493,19 +489,16 @@ class Main:
 			for x, y in zip(x_coords, y_coords):
 				geom_file.write(f"{x}\t{y}\n")
 		
-		#plt.plot(x_coords, y_coords)
-		#plt.gca().set_aspect('equal', adjustable='box')
-		#plt.show()
-
-		self.xgeom = x_coords
-		self.ygeom = y_coords
+		plt.plot(x_coords, y_coords)
+		plt.gca().set_aspect('equal', adjustable='box')
+		plt.show()
 
 		geometry_filename = f"Jahkowski_Airfoil_Geometry.txt"
 		with open(geometry_filename, 'w') as geom_file:
 			geom_file.write("X		Y\n")  # Write the header
 			for x, y in zip(x_coords, y_coords):
 				geom_file.write(f"{x} {y}\n")
-		#print(f"Geometry exported to {geometry_filename}")
+		print(f"Geometry exported to {geometry_filename}")
 
 	def run(self):
 		"""
@@ -515,31 +508,9 @@ class Main:
 		self.setup_Geometry()
 		self.load_flow_field(self.free_stream_velocity, self.angle_of_attack)
 		if self.type == 'airfoil':
-			CL, Cm0, Cm4 = self.get_coefficients()
-		#self.plot(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
-		n_points = np.linspace(10, 1000, 10)
-		self.setup_vortex_pannel_method(self.angle_of_attack)
-		CL_vals = []
-		Cmle_vals = []
-		Cmc4_vals = []
-		for n in n_points:
-			self.n_points = n
-			self.export_airfoil_geometery()
-			C_L, Cmle, Cmc4, _, _, _ = self.pannelmethod.run(self.xgeom, self.ygeom)
-			CL_vals.append(C_L)
-			Cmle_vals.append(Cmle)
-			Cmc4_vals.append(Cmc4)
-			print(f"Number of Points: {n}")
-		plt.plot(n_points, CL_vals, label='CL Pannel Method', color='red')
-		plt.axhline(CL, label='CL Jahkowski', color='red', linestyle='--')
-		plt.plot(n_points, Cmle_vals, label='Cm0 Pannel Method', color='blue')
-		plt.axhline(Cm0, label='Cm0 Jahkowski', color='blue', linestyle='--')
-		plt.plot(n_points, Cmc4_vals, label='Cmc4 Pannel Method', color='green')
-		plt.axhline(Cm4, label='Cmc4 Jahkowski', color='green', linestyle='--')
-		plt.xlabel('Number of Points')
-		plt.ylabel('Coefficient')
-		plt.legend()
-		plt.show()
+			self.get_coefficients()
+		self.plot(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
+		self.export_airfoil_geometery()
 
 if __name__ == "__main__":
 	main = Main('input.json')
