@@ -1,26 +1,52 @@
 {
     "geometry" : {
-        "cylinder_radius" : 2.0,
-        "type" : "airfoil",
-        "type_options" :
-            "cylinder = Joukowski cylinder (requires epsilon, zeta_0, vortex_strength), airfoil = Joukowski airfoil (requires design_CL and design_thickness)",
-        "epsilon" : 0.8,
-        "zeta_0" : [-0.5, 0.5],
-        "design_CL" : 0.261,
-        "design_thickness" : 0.12,
-        "n_points" : 1000
+        "airfoil" : "2412",
+        "airfoil_options" : "xxxx = NACA 4-digit series,ULxx = Uniform Load (requires CL_design),file = read airfoil from file (requires filename)",
+        "CL_design" : 0.2593304460915939,
+        "filename" : "Jahkowski_Airfoil_Geometry.txt",
+        "trailing_edge" : "closed",
+        "trailing_edge_options" : "open = standard NACA 4-digit open trailing edge,closed = modified thickness to close trailing edge",
+        "n_points" : 200
+        },
+    "airfoils" : {
+        "1" : {
+            "airfoil" : "2412",
+            "trailing_edge" : "closed",
+            "n_points" : 200,
+            "Leading_edge" : [0.0, 0.0],
+            "chord_length" : 1.0,
+            "mounting_angle[deg]" : 0.0
+        },
+        "2" : {
+            "airfoil" : "2412",
+            "trailing_edge" : "closed",
+            "n_points" : 200,
+            "Leading_edge" : [1.0, -0.5],
+            "chord_length" : 1.0,
+            "mounting_angle[deg]" : 0.0
+        }
     },
     "operating" : {
         "freestream_velocity" : 10.0,
-        "angle_of_attack[deg]" : 10.0,
-        "vortex_strength" : 80.0
+        "alpha[deg]" : 0.0
     },
-    "plot" : {
-        "x_start" : -5.0,
-        "x_lower_limit" : -5.0,
-        "x_upper_limit" : 5.0,
+    "alpha_sweep" : {
+        "start[deg]" : -12.0,
+        "end[deg]" : 16.0,
+        "increment[deg]" : 2.0
+    },
+    "plot_options" : {
+        "x_start" : -1.0,
+        "x_lower_limit" : -1.0,
+        "x_upper_limit" : 2.0,
         "delta_s" : 0.01,
-        "n_lines" : 20,
-        "delta_y" : 0.4
+        "n_lines" : 5,
+        "delta_y" : 0.1
+    },
+    "run_commands" : {
+        "plot_streamlines" : true,
+        "plot_pressure" : false,
+        "alpha_sweep" : false,
+        "export_geometry" : false
     }
 }

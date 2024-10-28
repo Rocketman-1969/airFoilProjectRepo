@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 import json
 import GeometeryClass
 import Flow
+from scipy.optimize import newton
 from VortexPannelMethod import VortexPannelMethod
+
 
 
 class Main:
@@ -49,56 +51,45 @@ class Main:
 			The path to the configuration file.
 		"""
 		self.config_file = config_file
-	
+		
+
 	def load_config(self):
 		"""
 		Loads the configuration from the JSON file.
 		"""
 		with open(self.config_file, 'r') as file:
 			json_vals = json.load(file)
-		self.radius = json_vals['geometry']['cylinder_radius']
-		self.type = json_vals['geometry']['type']
-		self.epsilon = json_vals['geometry']['epsilon']
-		self.z0 = json_vals['geometry']['zeta_0']
-		self.design_CL = json_vals['geometry']['design_CL']
-		self.design_thickness = json_vals['geometry']['design_thickness']
-		self.n_points = json_vals['geometry']['n_points']
-
+		self.LE = 0.0
+		self.TE = 1.0
+		self.x_start = json_vals['plot_options']['x_start']
+		self.x_low_val = json_vals['plot_options']['x_lower_limit']
+		self.x_up_val = json_vals['plot_options']['x_upper_limit']
+		self.delta_s = json_vals['plot_options']['delta_s']
+		self.n_lines = json_vals['plot_options']['n_lines']
+		self.delta_y = json_vals['plot_options']['delta_y']
 		self.free_stream_velocity = json_vals['operating']['freestream_velocity']
-		self.angle_of_attack = json_vals['operating']['angle_of_attack[deg]']
-		self.gamma = json_vals['operating']['vortex_strength']
-		
-		self.x_start = json_vals['plot']['x_start']
-		self.x_low_val = json_vals['plot']['x_lower_limit']
-		self.x_up_val = json_vals['plot']['x_upper_limit']
-		self.delta_s = json_vals['plot']['delta_s']
-		self.n_lines = json_vals['plot']['n_lines']
-		self.delta_y = json_vals['plot']['delta_y']
+		self.alpha = json_vals['operating']['alpha[deg]']
+		self.NACA = json_vals['geometry']['airfoil']
+		self.CL_design = json_vals['geometry']['CL_design']
+		self.trailing_edge_options = json_vals['geometry']['trailing_edge']
+		self.chord = 1.0
+		self.n_points = json_vals['geometry']['n_points']
+		self.alpha_sweep = json_vals['alpha_sweep']
+		self.run_commands = json_vals['run_commands']
+		self.geometery = json_vals['geometry']
 
-		self.LE = -1*self.radius + self.z0[0]
-		self.TE = self.radius + self.z0[0]
+	def setup_vortex_pannel_method(self, alpha):
+
+		self.pannelmethod = VortexPannelMethod(self.chord, self.free_stream_velocity, alpha)
+
 
 	def setup_Geometry(self):
 		"""
 		Initializes the Geometery object and calculates the camber, upper surface, and lower surface.
 		"""
-		if self.type == 'airfoil':
-			alpha = np.deg2rad(self.angle_of_attack)
-			V_inf = self.free_stream_velocity
-			x0 = (self.design_thickness * -4 / (3 * np.sqrt(3))) * self.radius
-			y0 = self.design_CL * self.radius / (2*np.pi*(1+(4*self.design_thickness/(3*np.sqrt(3)))))
-
-			self.epsilon = self.radius - np.sqrt(self.radius**2 - y0**2) - x0
-
-			self.z0 = [x0, y0]
-			
-			self.LE = -1 * np.sqrt(self.radius**2 - y0**2) + x0
-			self.TE = np.sqrt(self.radius**2 - y0**2) + x0
-			self.gamma = 4*np.pi*V_inf*(np.sqrt(self.radius**2 - y0**2)*np.sin(alpha) + y0*np.cos(alpha))
-
-		self.geometry = GeometeryClass.Geometery(self.radius, self.z0, self.epsilon)
+		self.geometry = GeometeryClass.Geometery(self.NACA, self.n_points, self.trailing_edge_options, self.CL_design)
 		
-	def load_flow_field(self, V_inf, alpha):
+	def load_flow_field(self, alpha):
 		"""
 		Loads the flow field parameters.
 
@@ -106,11 +97,7 @@ class Main:
 		V_inf (float): The free stream velocity.
 		alpha (float): The angle of attack.
 		"""
-		self.flow = Flow.Flow(self.radius, V_inf, alpha, self.x_low_val, self.x_up_val, self.epsilon, self.gamma , self.z0)
-	
-	def setup_vortex_pannel_method(self, alpha):
-
-			self.pannelmethod = VortexPannelMethod(1.0, self.free_stream_velocity, alpha)
+		self.flow = Flow.Flow(self.free_stream_velocity, alpha, self.x_low_val, self.x_up_val, self.pannelmethod)
 
 	def surface_tangent(self, x):
 		"""
@@ -123,25 +110,22 @@ class Main:
         Returns:
         tuple: A tuple containing the unit normal vectors for the upper and lower surfaces.
         """
-		delta = 1e-5  # Small perturbation for numerical differentiation
+		delta = 1e-3  # Small perturbation for numerical differentiation
 
         # Interpolate to find the y-coordinate at x
-		#Trailing Edge Case
-		if np.abs(x-self.TE) < delta:
-			_, y_upper_minus, y_lower_minus = self.geometry.geometery_zplane(x-delta)
+		if np.abs(x-self.chord) < delta:
+			y_upper_minus, y_lower_minus = self.geometry.generate_naca4_airfoil(self.NACA,x-delta)
 			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), -1*(y_upper_minus[1]-y_lower_minus[1])])
 			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), -1*(y_upper_minus[1]-y_lower_minus[1])])
-		#Leading Edge Case	
-		elif np.abs(x-self.LE) < delta:
-			_,y_upper_plus, y_lower_plus = self.geometry.geometery_zplane(x+delta)
+		elif np.abs(x) < delta:
+			y_upper_plus, y_lower_plus = self.geometry.generate_naca4_airfoil(self.NACA,x+delta)
 
 			tangent_upper = np.array([-1*np.abs(y_upper_plus[0]-y_upper_plus[0]), y_upper_plus[1]-y_lower_plus[1]])
 			tangent_lower = np.array([-1*np.abs(y_upper_plus[0]-y_upper_plus[0]), y_upper_plus[1]-y_lower_plus[1]])
-		#General Case
 		else:
-			_,y_upper_plus, y_lower_plus = self.geometry.geometery_zplane(x+delta)
+			y_upper_plus, y_lower_plus = self.geometry.generate_naca4_airfoil(self.NACA,x+delta)
 
-			_,y_upper_minus, y_lower_minus = self.geometry.geometery_zplane(x-delta)
+			y_upper_minus, y_lower_minus = self.geometry.generate_naca4_airfoil(self.NACA,x-delta)
 
 			tangent_upper = np.array([np.abs(y_upper_plus[0]-y_upper_minus[0]), y_upper_plus[1] - y_upper_minus[1]])
 			tangent_lower = np.array([-1 * np.abs(y_lower_plus[0]-y_lower_minus[0]), -1*(y_lower_plus[1] - y_lower_minus[1])])
@@ -166,35 +150,10 @@ class Main:
         Returns:
         np.ndarray: The unit tangent vector at the given x-coordinate.
         """
-		delta = 1e-5  # Small perturbation for numerical differentiation
+		unit_tangent_upper, unit_tangent_lower = self.surface_tangent(x)
 
-        # Interpolate to find the y-coordinate at x
-		if np.abs(x-self.radius) < delta:
-			_,y_upper_minus, y_lower_minus = self.geometry.geometery_zplane(x-delta)
-			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_minus[1]-y_lower_minus[1]])
-			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_minus[1]-y_lower_minus[1]])
-
-			normal_upper = np.array([tangent_upper[1], tangent_upper[0]])
-			normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])		
-		elif np.abs(x+self.radius) < delta:
-			_,y_upper_plus, y_lower_plus = self.geometry.geometery_zplane(x+delta)
-
-			tangent_upper = np.array([-1 * np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1]-y_lower_plus[1]])
-			tangent_lower = np.array([-1 * np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1]-y_lower_plus[1]])
-
-			normal_upper = np.array([-tangent_upper[1], tangent_upper[0]])
-			normal_lower = np.array([-tangent_lower[1], -tangent_lower[0]]) 
-		else:
-			_,y_upper_plus, y_lower_plus = self.geometry.geometery_zplane(x+delta)
-
-			_,y_upper_minus, y_lower_minus = self.geometry.geometery_zplane(x-delta)
-
-			tangent_upper = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), y_upper_plus[1] - y_upper_minus[1]])
-			tangent_lower = np.array([np.abs(y_upper_minus[0]-y_upper_minus[0]), (y_lower_plus[1] - y_lower_minus[1])])
-
-
-			normal_upper = np.array([-tangent_upper[1], tangent_upper[0]])
-			normal_lower = np.array([tangent_lower[1], -tangent_lower[0]])
+		normal_upper = np.cross([unit_tangent_upper[0], unit_tangent_upper[1], 0], [0, 0, 1])
+		normal_lower = np.cross([unit_tangent_lower[0], unit_tangent_lower[1], 0], [0, 0, 1])
 
 		unit_normal_upper = normal_upper / np.linalg.norm(normal_upper)	
 		unit_normal_lower = normal_lower / np.linalg.norm(normal_lower)
@@ -212,17 +171,62 @@ class Main:
 		tuple: A tuple containing the tangential velocity for the upper and lower surfaces.
 		"""
 		unit_tangent_upper, unit_tangent_lower = self.surface_tangent(x)
+		unit_normal_upper, unit_normal_lower = self.surface_normal(x)
+
+		x_geo,y_geo, _ = self.geometry.generate_naca4_airfoil(self.NACA,self.xcos)
+		
 
 		if upper:
-			_, point, _ = self.geometry.geometery_zplane(x)
-			velocity_upper = np.dot(self.flow.flow_over_eleptic_cylinder(point[0], point[1]), unit_tangent_upper)
+			point, _ = self.geometry.generate_naca4_airfoil(self.NACA,x)
+			point[0] += 1e-5 * unit_normal_upper[0]
+			point[1] += 1e-5 * unit_normal_upper[1]
+			velocity = self.flow.flow_around_an_airfoil(x_geo, y_geo, point[0], point[1], self.gamma)
+			velocity_upper = np.dot(velocity, unit_tangent_upper)
 			return velocity_upper
 		else:
-			_, _, point = self.geometry.geometery_zplane(x)
-			velocity = self.flow.flow_over_eleptic_cylinder(point[0], point[1])
-			velocity_lower = np.dot(velocity, unit_tangent_lower)
+			_, point = self.geometry.generate_naca4_airfoil(self.NACA, x)
+			point[0] += 1e-5 * unit_normal_lower[0]
+			point[1] += 1e-5 * unit_normal_lower[1]
+			velocity = self.flow.flow_around_an_airfoil(x_geo, y_geo, point[0], point[1], self.gamma)
+			velocity_lower = np.dot(velocity, unit_tangent_lower)	
 			return velocity_lower
 
+	def surface_Cp(self, xcp, ycp):
+		"""
+		Calculate the pressure coefficient at a given x-coordinate.
+
+		Parameters:
+		x (float): The x-coordinate at which to calculate the pressure coefficient.
+
+		Returns:
+		tuple: A tuple containing the pressure coefficient for the upper and lower surfaces.
+		"""
+		Cp = []
+
+		for i in range(len(xcp)):
+
+			dx = self.x_geo[i+1] - self.x_geo[i]
+			dy = self.y_geo[i+1] - self.y_geo[i]
+			
+			tangent = np.array([dx, dy])
+			tangent = tangent / np.linalg.norm(tangent)
+
+			normal = np.array([tangent[1], -tangent[0]])
+	
+	
+			pointx = xcp[i] + 1e-5 * normal[0]
+			pointy = ycp[i] + 1e-5 * normal[1]
+
+			
+			velocity = self.flow.flow_around_an_airfoil(self.x_geo, self.y_geo, pointx, pointy, self.gamma)
+		
+			velocity = np.linalg.norm(velocity)
+			
+			Cptemp = 1 - (velocity / self.free_stream_velocity) ** 2
+			Cp.append(Cptemp)
+
+		return Cp
+	
 	def stagnation_point(self):
 		"""
         Calculate the stagnation point of the flow field.
@@ -233,56 +237,34 @@ class Main:
 		epsilon = 1e-5  # Small perturbation for numerical differentiation
 
         # Check leading edge (LE) and trailing edge (TE)
-		
 		velocity_LE = self.surface_tangential_velocity(self.LE)
-		velocity_TE = self.surface_tangential_velocity(self.TE, upper=False)
+		if "filename" in self.geometery:
+			forward_stagnation_point = [-0.01,0]
 
-		if np.abs(velocity_LE) < epsilon:
-			forward_stagnation_point = [self.LE, self.z0[1]]
-		else:
-			if velocity_LE < 0:
-                # Use upper surface
-				upper_flag = True
-				def velocity_function(x):
-					v = self.surface_tangential_velocity(x, upper=upper_flag)
-					return v
-				x_stag = self.bisection_method(velocity_function, self.LE, self.TE-self.radius)
-				_, forward_stagnation_point, _ = self.geometry.geometery_zplane(x_stag)
+		else:	
+			if np.abs(velocity_LE) < epsilon:
+				forward_stagnation_point = [self.LE, 0]
 			else:
-                # Use lower surface
-				upper_flag = False
-				def velocity_function(x):
-					v = self.surface_tangential_velocity(x, upper=upper_flag)
-					return v
-				x_stag = self.bisection_method(velocity_function, self.LE, self.TE-self.radius)
-				_, _, forward_stagnation_point = self.geometry.geometery_zplane(x_stag)
-		
-		if self.type == 'airfoil':
-			_, aft_stagnation_point, _ = self.geometry.geometery_zplane(self.TE)
-		else:
-			if np.abs(velocity_TE) < epsilon:
-				aft_stagnation_point = [self.TE, self.z0[1]]
-			else:
-				if velocity_TE > 0:
-					# Use lower surface
-					upper_flag = False
-					def velocity_function(x):
-						v = self.surface_tangential_velocity(x, upper=upper_flag)
-						return v
-					x_stag = self.bisection_method(velocity_function, self.LE+self.radius, self.TE)
-					_, _, aft_stagnation_point = self.geometry.geometery_zplane(x_stag)
-				else:
+				if velocity_LE < 0:
 					# Use upper surface
 					upper_flag = True
 					def velocity_function(x):
-						v = self.surface_tangential_velocity(x, upper=upper_flag)
-						return v
-					x_stag = self.bisection_method(velocity_function, self.LE+self.radius, self.TE)
-					_, aft_stagnation_point, _ = self.geometry.geometery_zplane(x_stag)
-		
+						return self.surface_tangential_velocity(x, upper=upper_flag)
+					x_stag = self.bisection_method(velocity_function, self.LE, self.TE-0.6)
+					forward_stagnation_point, _ = self.geometry.generate_naca4_airfoil(self.NACA,x_stag)
+				else:
+					# Use lower surface
+					upper_flag = False
+					def velocity_function(x):
+						return self.surface_tangential_velocity(x, upper=upper_flag)
+					x_stag = self.bisection_method(velocity_function, self.LE, self.TE-0.6, tol=epsilon)
+					_, forward_stagnation_point = self.geometry.generate_naca4_airfoil(self.NACA,x_stag)
+
+		aft_stagnation_point = [1, 0]
+
 		return forward_stagnation_point, aft_stagnation_point
-	
-	def bisection_method(self,f, a, b, tol=1e-10, max_iter=1000):
+
+	def bisection_method(self,f, a, b, tol=1e-10, max_iter=100):
 		"""
 		Bisection method to find the root of a function f(x) = 0.
 		
@@ -305,7 +287,6 @@ class Main:
 		
 		# Check if a root is guaranteed in the initial interval
 		if f(a) * f(b) >= 0:
-			
 			print("Bisection method fails. The function must have different signs at the endpoints.")
 			return None
 		
@@ -325,36 +306,9 @@ class Main:
 				a = c  # Root is in the right half
 		
 		print("Warning: Maximum number of iterations reached.")
-		return c
-
-	def z_2_zeta(self, z):
-		z = z[0] + 1j * z[1]
-		z1 = z**2 - 4 * (self.radius - self.epsilon) ** 2
-		z0 = self.z0[0] + 1j * self.z0[1]
-
-		if np.real(z1) > 0:
-			zeta_1 = (z + np.sqrt(z1)) / 2
-			zeta_2 = (z - np.sqrt(z1)) / 2
-		elif np.real(z1) < 0:
-			zeta_1 = (z - 1j * np.sqrt(-z1)) / 2
-			zeta_2 = (z + 1j * np.sqrt(-z1)) / 2
-		elif np.imag(z1) > 0:
-			zeta_1 = (z + np.sqrt(z1)) / 2
-			zeta_2 = (z - np.sqrt(z1)) / 2
-		else:
-			zeta_1 = (z - 1j * np.sqrt(-z1)) / 2
-			zeta_2 = (z + 1j * np.sqrt(-z1)) / 2
-
-		if abs(zeta_2 - z0) > abs(zeta_1 - z0):
-			zeta = zeta_2
-		else:
-			zeta = zeta_1
-		
-		zeta = np.array([zeta.real, zeta.imag])
-
-		return zeta
-
-	def plot(self, x_start, x_lower_limit, x_upper_limit, delta_s, n_lines, delta_y):
+		return None
+	
+	def plot_streamlines(self, x_start, x_lower_limit, x_upper_limit, delta_s, n_lines, delta_y):
 		"""
 		Plot the streamlines for the flow field.
 
@@ -366,180 +320,176 @@ class Main:
 		n_lines (int): The number of streamlines to plot.
 		delta_y (float): The spacing between streamlines.
 		"""
-		x = np.linspace(self.LE, self.TE, 10000)
-		camber = np.empty((2, 0))
-		upper_surface = np.empty((2, 0))
-		lower_surface = np.empty((2, 0))
+		plt.figure()
 
-		for i in range(len(x)):
-			camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.geometery_zeta(x[i])
+		if "filename" in self.geometery:
+			forward_stagnation_point = [-0.01,0]
+			aft_stagnation_point = [1.01, 0]
 
-			# Append the new values to the arrays
-			camber = np.hstack((camber, camber_temp.reshape(2, 1)))
-			upper_surface = np.hstack((upper_surface, upper_surface_temp.reshape(2, 1)))
-			lower_surface = np.hstack((lower_surface, lower_surface_temp.reshape(2, 1)))
-
-		
-
-		camber_z = np.empty((2, 0))
-		upper_surface_z = np.empty((2, 0))
-		lower_surface_z = np.empty((2, 0))
-		
-		for i in range(len(x)):
-			camber_temp, upper_surface_temp, lower_surface_temp = self.geometry.geometery_zplane(x[i])
-
-			# Append the new values to the arrays
-			camber_z = np.hstack((camber_z, camber_temp.reshape(2, 1)))
-			upper_surface_z = np.hstack((upper_surface_z, upper_surface_temp.reshape(2, 1)))
-			lower_surface_z = np.hstack((lower_surface_z, lower_surface_temp.reshape(2, 1)))
-							 
-		
+			forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0], forward_stagnation_point[1], -1*delta_s, self.x_geo, self.y_geo, self.gamma)
+			forward_stag_streamline = np.vstack(([forward_stagnation_point[0], forward_stagnation_point[1]], forward_stag_streamline))
+			aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0], aft_stagnation_point[1], delta_s,  self.x_geo, self.y_geo, self.gamma)
+			aft_stag_streamline = np.vstack(([aft_stagnation_point[0], aft_stagnation_point[1]], aft_stag_streamline))
+			plt.plot(self.x_geo, self.y_geo, label='airfoil', color='blue')
+		else:	
 		#calculate stagnation points
-		forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
-		forward_stag_point_zeta = self.z_2_zeta(forward_stagnation_point)
-		aft_stag_point_zeta = self.z_2_zeta(aft_stagnation_point)
-		forward_normal_stag_up, forward_normal_stag_down = self.surface_normal(forward_stag_point_zeta[0])
-		aft_normal_stag_up, aft_normal_stag_down = self.surface_normal(aft_stag_point_zeta[0])
+			forward_stagnation_point, aft_stagnation_point = self.stagnation_point()
+			print("Forward Stagnation Point: ", forward_stagnation_point)
+			forward_normal_stag_up, forward_normal_stag_down = self.surface_normal(forward_stagnation_point[0])
+			aft_normal_stag_up, aft_normal_stag_down = self.surface_normal(aft_stagnation_point[0])
+			if forward_stagnation_point[1] < 0:
+				forward_normal_stag = forward_normal_stag_down
+			else:
+				forward_normal_stag = forward_normal_stag_up
+			if aft_stagnation_point[1] < 0:
+				aft_normal_stag = aft_normal_stag_down
+			else:
+				aft_normal_stag = aft_normal_stag_up
 
-		if forward_stagnation_point[1] < 0:
-			forward_normal_stag = forward_normal_stag_down
-		else:
-			forward_normal_stag = forward_normal_stag_up
-
-		if aft_stagnation_point[1] < 0:
-			aft_normal_stag = aft_normal_stag_down
-		else:
-			aft_normal_stag = aft_normal_stag_up
-		
-		print("Forward Stagnation Point: ", forward_stagnation_point)
-		print("Aft Stagnation Point: ", aft_stagnation_point)
+			forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0]+forward_normal_stag[0] * 1e-3, forward_stagnation_point[1]+forward_normal_stag[1] * 1e-3, -1*delta_s, self.x_geo, self.y_geo, self.gamma)
+			forward_stag_streamline = np.vstack(([forward_stagnation_point[0], forward_stagnation_point[1]], forward_stag_streamline))
+			aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0]+aft_normal_stag[0] * 1e-3, aft_stagnation_point[1] + aft_normal_stag[1]*1e-3, delta_s,  self.x_geo, self.y_geo, self.gamma)
+			aft_stag_streamline = np.vstack(([aft_stagnation_point[0], aft_stagnation_point[1]], aft_stag_streamline))
+			plt.plot(self.x_geo, self.y_geo, label='airfoil', color='blue')
+			plt.plot(self.xcos,self.yc, color='red', label='Camber Line')
 
 		# Set up the plot
-		plt.figure()
-		plt.plot(camber_z[0, :], camber_z[1, :], label='Camber', color='blue')
-		plt.plot(upper_surface_z[0, :], upper_surface_z[1, :], label='Upper Surface', color='blue')
-		plt.plot(lower_surface_z[0, :], lower_surface_z[1, :], label='Lower Surface',color='blue')
-		plt.plot(upper_surface[0, :], upper_surface[1, :], label='Upper Surface', color='red', linestyle='--')
-		plt.plot(lower_surface[0, :], lower_surface[1, :], label='Lower Surface',color='red', linestyle='--')
-		plt.plot(self.z0[0], self.z0[1], label='Center of Circle', color='red', marker='o', markerfacecolor='none')
-		plt.plot((self.radius-self.epsilon), 0, label='zeta stag point', color='red', marker='.')
-		plt.plot(-1*(self.radius-self.epsilon), 0, label='zeta stag point', color='red', marker='.')
-		plt.plot(2*(self.radius-self.epsilon), 0, label='zeta stag point', color='blue', marker='.')
-		plt.plot(-2*(self.radius-self.epsilon), 0, label='zeta stag point', color='blue', marker='.')
 		
+		plt.xlabel('X')
+		plt.ylabel('Y')
+		plt.title('Streamlines')
 		# Calculate the streamlines
-		forward_stag_streamline = self.flow.streamlines(forward_stagnation_point[0] + 1e-6*forward_normal_stag[0], forward_stagnation_point[1] + 1e-6*forward_normal_stag[1], -1*delta_s)
-		aft_stag_streamline = self.flow.streamlines(aft_stagnation_point[0] + 1e-6*aft_normal_stag[0], aft_stagnation_point[1] + 1e-6*aft_normal_stag[1], delta_s)
+		
 		plt.plot(forward_stag_streamline[:, 0], forward_stag_streamline[:, 1],color='black')
 		plt.plot(aft_stag_streamline[:, 0], aft_stag_streamline[:, 1],color='black')
 
 		for i in range(n_lines):
+			print("Hold onto your seats, we're calculating those streamlines! ✈️ Predicting lift and making aerodynamic magic happen! 🚀💨")
 			x = x_start
 			y = -delta_y * (i+1) + forward_stag_streamline[-1,1]
-			streamline = self.flow.streamlines(x, y, delta_s)
+			streamline = self.flow.streamlines(x, y, delta_s, self.x_geo, self.y_geo, self.gamma)
+			streamline = np.vstack(([x, y], streamline))
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
 			y = delta_y * (i+1) + forward_stag_streamline[-1,1]
-			streamline = self.flow.streamlines(x, y, delta_s)
+			streamline = self.flow.streamlines(x, y, delta_s, self.x_geo, self.y_geo, self.gamma)
+			streamline = np.vstack(([x, y], streamline))
+			streamline = np.column_stack((streamline, np.full(streamline.shape[0], x), np.full(streamline.shape[0], y)))
 			plt.plot(streamline[:, 0], streamline[:, 1],color='black')
+		# plt.plot(forward_stagnation_point[0], forward_stagnation_point[1], 'ro', label='Forward Stagnation Point')
+		# plt.plot(aft_stagnation_point[0], aft_stagnation_point[1], 'ro', label='Aft Stagnation Point')
 
 
 		plt.xlim(x_lower_limit, x_upper_limit)
-		plt.ylim(x_lower_limit, x_upper_limit)
-		plt.axhline(0, color='black',linewidth=1) 
-		plt.axvline(0, color='black',linewidth=1)
-		plt.xlabel('X')
-		plt.ylabel('Y')
-		plt.title('Streamlines')
+		plt.ylim(-0.5, 0.5)
 		plt.gca().set_aspect('equal', adjustable='box')
+		print("Oh, *finally*! The streamlines are done, and we've predicted the lift. I thought we’d have to wait for next year’s airshow... 🚀🙃")
 		plt.show()
 
-	def get_coefficients(self):
-		alpha = np.deg2rad(self.angle_of_attack)
-		x0 = self.z0[0]
-		y0 = self.z0[1]
-		CL = 2*np.pi*((np.sin(alpha) + y0*np.cos(alpha)/np.sqrt(self.radius**2-y0**2))/(1+x0/(np.sqrt(self.radius**2-y0**2)-x0)))
-		Cm0 = (np.pi/4)*((self.radius**2-y0**2-x0**2)/(self.radius**2-y0**2))**2*np.sin(2*alpha)-(1/4)*CL*((x0*np.cos(alpha)+y0*np.sin(alpha))/(self.radius**2-y0**2))*(np.sqrt(self.radius**2-y0**2)-x0)
-		self.zt = 2*(np.sqrt(self.radius**2 - y0**2) + x0)
-		self.zl = -2*(self.radius**2 - y0**2 + x0**2) / (np.sqrt(self.radius**2 - y0**2) - x0)
-		Zc4 = self.zl + 0.25*(self.zt-self.zl)
-		Cm4 = Cm0 + CL*(Zc4*np.cos(alpha)+0*np.sin(alpha))/(self.zt-self.zl)
+	def plot_cp(self, x_cp, y_cp):
 
-		print("CL: ", CL)
-		print("Cm0: ", Cm0)
-		print("Cm4: ", Cm4)
-
-		return CL, Cm0, Cm4
-	
-	def export_airfoil_geometery(self):
-		xcos = self.geometry.Cose_cluster(self.n_points)
+		Cp = self.surface_Cp(x_cp, y_cp)
 		
-		xcos = xcos*(self.TE - self.LE) + self.LE
-		_, upper_surface, lower_surface = self.geometry.geometery_zplane(xcos)
-		xu = (upper_surface[0] - self.zl)/(self.zt - self.zl)
-		yu = (upper_surface[1])/(self.zt - self.zl)
-		xl = (lower_surface[0] - self.zl)/(self.zt - self.zl)
-		yl = (lower_surface[1])/(self.zt - self.zl)
-
-		if self.n_points % 2 == 1:
-			x_coords = np.concatenate([xu[::-1], xl[1:]])
-			y_coords = np.concatenate([yu[::-1], yl[1:]])
-		else:
-			x_coords = np.concatenate([xu[::-1], xl[1:]])
-			y_coords = np.concatenate([yu[::-1], yl[1:]])
-		
-		geometry_filename = f"Jahkowski_Airfoil_Geometry.txt"
-		with open(geometry_filename, 'w') as geom_file:
-			geom_file.write("X\tY\n")  # Write the header
-			for x, y in zip(x_coords, y_coords):
-				geom_file.write(f"{x}\t{y}\n")
-		
-		#plt.plot(x_coords, y_coords)
-		#plt.gca().set_aspect('equal', adjustable='box')
-		#plt.show()
-
-		self.xgeom = x_coords
-		self.ygeom = y_coords
-
-		geometry_filename = f"Jahkowski_Airfoil_Geometry.txt"
-		with open(geometry_filename, 'w') as geom_file:
-			geom_file.write("X		Y\n")  # Write the header
-			for x, y in zip(x_coords, y_coords):
-				geom_file.write(f"{x} {y}\n")
-		#print(f"Geometry exported to {geometry_filename}")
+		plt.plot(x_cp, Cp, label='Cp Upper')
+		plt.ylim(plt.ylim()[::-1])
+		plt.xlim(0, 1)
+		plt.xlabel('x/c')
+		plt.ylabel('Pressure Coefficient')
+		plt.show()
 
 	def run(self):
 		"""
 		Executes the main logic of the application.
 		"""
+		
 		self.load_config()
-		self.setup_Geometry()
-		self.load_flow_field(self.free_stream_velocity, self.angle_of_attack)
-		if self.type == 'airfoil':
-			CL, Cm0, Cm4 = self.get_coefficients()
-		#self.plot(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
-		n_points = np.linspace(10, 1000, 10)
-		self.setup_vortex_pannel_method(self.angle_of_attack)
-		CL_vals = []
-		Cmle_vals = []
-		Cmc4_vals = []
-		for n in n_points:
-			self.n_points = n
-			self.export_airfoil_geometery()
-			C_L, Cmle, Cmc4, _, _, _ = self.pannelmethod.run(self.xgeom, self.ygeom)
-			CL_vals.append(C_L)
-			Cmle_vals.append(Cmle)
-			Cmc4_vals.append(Cmc4)
-			print(f"Number of Points: {n}")
-		plt.plot(n_points, CL_vals, label='CL Pannel Method', color='red')
-		plt.axhline(CL, label='CL Jahkowski', color='red', linestyle='--')
-		plt.plot(n_points, Cmle_vals, label='Cm0 Pannel Method', color='blue')
-		plt.axhline(Cm0, label='Cm0 Jahkowski', color='blue', linestyle='--')
-		plt.plot(n_points, Cmc4_vals, label='Cmc4 Pannel Method', color='green')
-		plt.axhline(Cm4, label='Cmc4 Jahkowski', color='green', linestyle='--')
-		plt.xlabel('Number of Points')
-		plt.ylabel('Coefficient')
-		plt.legend()
-		plt.show()
+
+		if "filename" in self.geometery:
+			geometry_filename = self.geometery["filename"]
+			print(f"Loading geometry from {geometry_filename}... 🚀📈")
+			with open(geometry_filename, 'r') as geom_file:
+				lines = geom_file.readlines()
+				header = lines[0].strip().split()  # Read the header
+				x_geo, y_geo = [], [],
+				for line in lines[1:]:
+					x, y = map(float, line.strip().split())
+					x_geo.append(x)
+					y_geo.append(y)
+					
+			self.x_geo = np.array(x_geo)
+			self.y_geo = np.array(y_geo)
+			
+		else:
+			self.setup_Geometry()
+			self.xcos = self.geometry.Cose_cluster(self.n_points)
+			self.x_geo, self.y_geo, self.yc = self.geometry.generate_naca4_airfoil(self.NACA, self.xcos)
+
+
+		if self.run_commands["export_geometry"] == True:
+
+			print("Exporting the geometry... 🚀📈")
+				# Prepare the output file for geometry
+			geometry_filename = f"{self.NACA}_Geometry.txt"
+			with open(geometry_filename, 'w') as geom_file:
+				geom_file.write("X		Y\n")  # Write the header
+				for x, y in zip(self.x_geo, self.y_geo):
+					geom_file.write(f"{x} {y}\n")
+			print(f"Geometry exported to {geometry_filename}")
+					
+
+		alpha = self.alpha
+
+		print("Calculating the lift and moment coefficients... 🚀📈")
+		print(f"Airfoil: {self.NACA}")
+
+		# Prepare the output file
+		output_filename = f"{self.NACA}_AeroCoefOut.txt"
+		with open(output_filename, 'w') as outfile:
+			outfile.write("Alpha CL Cmle Cmc4\n")  # Write the header
+
+			if self.run_commands["alpha_sweep"] == True:
+				alphas = np.arange(self.alpha_sweep["start[deg]"], self.alpha_sweep["end[deg]"] + self.alpha_sweep["increment[deg]"], self.alpha_sweep["increment[deg]"])
+				for alpha in alphas:
+					self.setup_vortex_pannel_method(alpha)
+					self.load_flow_field(alpha)
+
+					CL, Cmle, Cmc4, x_cp, y_cp, self.gamma = self.pannelmethod.run(self.x_geo, self.y_geo)
+					print(f"Alpha: {alpha}")
+					print(f"CL: {CL[0]}")
+					print(f"Cmle: {Cmle[0]}")
+					print(f"Cmc4: {Cmc4[0]}")
+
+					# Write the results to the file
+					outfile.write(f"{alpha} {CL[0]} {Cmle[0]} {Cmc4[0]}\n")
+
+					if self.run_commands['plot_streamlines'] == True:
+						print("Calculating streamlines... 🚀💨")
+						self.plot_streamlines(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
+
+					if self.run_commands['plot_pressure'] == True:
+						print("Calculating pressure coefficient... 🚀📈")
+						self.plot_cp(x_cp, y_cp)
+
+			else:
+				self.setup_vortex_pannel_method(alpha)
+				self.load_flow_field(alpha)
+
+				CL, Cmle, Cmc4, x_cp, y_cp, self.gamma = self.pannelmethod.run(self.x_geo, self.y_geo)
+				print(f"Alpha: {alpha}")
+				print(f"CL: {CL[0]}")
+				print(f"Cmle: {Cmle[0]}")
+				print(f"Cmc4: {Cmc4[0]}")
+
+				# Write the results to the file
+				outfile.write(f"{alpha} {CL} {Cmle} {Cmc4}\n")
+
+				if self.run_commands['plot_streamlines'] == True:
+					print("Calculating streamlines... 🚀💨")
+					self.plot_streamlines(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
+
+				if self.run_commands['plot_pressure'] == True:
+					print("Calculating pressure coefficient... 🚀📈")
+					self.plot_cp(x_cp, y_cp)
+		
 
 if __name__ == "__main__":
 	main = Main('input.json')
