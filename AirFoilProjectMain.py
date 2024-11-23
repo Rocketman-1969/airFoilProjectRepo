@@ -427,10 +427,6 @@ class Main:
 				'TE': airfoil['trailing_edge'],
 				'NACA': airfoil['airfoil']
 			}
-
-		
-
-
 			plt.plot(xgeo_transform, ygeo_transform, label=f'airfoil {airfoil_key}', color='blue')
 			plt.plot(xcos, yc, label=f'Camber Line {airfoil_key}', color='red')
 		plt.show()
@@ -443,16 +439,13 @@ class Main:
 		self.NACA = airfoil_geometry['element0']['NACA']
 		self.xcos = airfoil_geometry['element0']['xcos']
 		self.yc = airfoil_geometry['element0']['yc']
-		self.setup_vortex_pannel_method(alpha)
-		self.load_flow_field(alpha)
-		CL, Cmle, Cmc4, x_cp, y_cp, self.gamma = self.pannelmethod.run(self.x_geo, self.y_geo)
-		self.plot_streamlines(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
+		# self.setup_vortex_pannel_method(alpha)
+		# self.load_flow_field(alpha)
+		# CL, Cmle, Cmc4, x_cp, y_cp, self.gamma = self.pannelmethod.run(self.x_geo, self.y_geo)
+		# self.plot_streamlines(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
 
-
-
-		
 
 if __name__ == "__main__":
-	main = Main('airFoilProjectRepo/input.json')
+	main = Main('input.json')
 	main.run()
 	
