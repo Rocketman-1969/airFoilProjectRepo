@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 class VortexPannelMethod:
 
@@ -59,9 +61,9 @@ class VortexPannelMethod:
                                                             - ((y_i[i+1] - y_i[i]) / l_i) * P[0, 0]
                         if offset_i + i < n_total and offset_j + j + 1 < n_total:
                             A[offset_i + i, offset_j + j + 1] += ((x_i[i+1] - x_i[i]) / l_i) * P[1, 1] \
-                                                            - ((y_i[i+1] - y_i[i]) / l_i) * P[0, 1]
-                    offset_j += len(x_j) - 1
-            offset_i += len(x_i) - 1
+                                                           - ((y_i[i+1] - y_i[i]) / l_i) * P[0, 1]
+                offset_j += len(x_j) - 1
+        offset_i += len(x_i) - 1
 
         # Apply Kutta condition for each airfoil
         offset = 0
@@ -70,13 +72,9 @@ class VortexPannelMethod:
             A[offset + len(x) - 2, offset + len(x) - 2] = 1.0
             offset += len(x) - 1
 
-        # Regularize the matrix to avoid numerical issues
-        A += 1e-10 * np.eye(A.shape[0])
-        print(f"Matrix A:\n{A}")
+        A += 1e-10 * np.eye(A.shape[0])  # Regularization
         return A
 
-
-    
     def get_B_matrix(self, x_all, y_all):
         n_total = sum(len(x) - 1 for x in x_all)
         B = np.zeros((n_total, 1))
@@ -88,14 +86,100 @@ class VortexPannelMethod:
                 B[offset + i, 0] = self.velocity * ((y[i+1] - y[i]) * np.cos(alpha) - (x[i+1] - x[i]) * np.sin(alpha)) / l_j
             offset += len(x) - 1
         return B
-    
+
     def get_gamma(self, A, B):
-        gamma = np.linalg.solve(A,B)
-        return gamma
-    
+        return np.linalg.solve(A, B)
+
     def run(self, x_all, y_all):
         x_cp_all, y_cp_all = zip(*[self.get_control_points(x, y) for x, y in zip(x_all, y_all)])
         A = self.get_A_matrix(x_all, y_all, x_cp_all, y_cp_all)
         B = self.get_B_matrix(x_all, y_all)
-        gamma = self.get_gamma(A, B)
-        return gamma
+        gamma_global = self.get_gamma(A, B)
+
+        # Split gamma into separate arrays for each airfoil
+        gamma_split = []
+        offset = 0
+        for x in x_all:
+            n_panels = len(x) - 1
+            gamma_split.append(gamma_global[offset:offset + n_panels].flatten())
+            offset += n_panels
+
+        return gamma_split
+
+
+    def induced_velocity(self, x, y, x_panel, y_panel, gamma):
+        u, v = 0, 0
+        for i in range(len(x_panel) - 1):
+            x1, y1 = x_panel[i], y_panel[i]
+            x2, y2 = x_panel[i + 1], y_panel[i + 1]
+            dx, dy = x2 - x1, y2 - y1
+            r1 = np.sqrt((x - x1)**2 + (y - y1)**2)
+            r2 = np.sqrt((x - x2)**2 + (y - y2)**2)
+            theta1 = np.arctan2(y - y1, x - x1)
+            theta2 = np.arctan2(y - y2, x - x2)
+            cross = dx * (y - y1) - dy * (x - x1)
+            u += gamma[i] * cross * (1 / r1 - 1 / r2) / (2 * np.pi)
+            v += gamma[i] * cross * (theta2 - theta1) / (2 * np.pi)
+        return u, v
+
+    def plot_streamlines(self, x_all, y_all, gamma_split, grid_size=100):
+        """
+        Plot streamlines around the airfoil(s).
+        
+        Parameters:
+            x_all, y_all: List of x and y coordinates of all airfoils.
+            gamma_split: List of circulation strengths for each airfoil.
+            grid_size: Number of points in each direction for the velocity grid.
+        """
+        x_min, x_max = min(min(x) for x in x_all), max(max(x) for x in x_all)
+        y_min, y_max = min(min(y) for y in y_all), max(max(y) for y in y_all)
+        x_range = x_max - x_min
+        y_range = y_max - y_min
+        x_min -= 0.5 * x_range
+        x_max += 0.5 * x_range
+        y_min -= 0.5 * y_range
+        y_max += 0.5 * y_range
+        x_grid = np.linspace(x_min, x_max, grid_size)
+        y_grid = np.linspace(y_min, y_max, grid_size)
+        X, Y = np.meshgrid(x_grid, y_grid)
+        U = np.full_like(X, self.velocity * np.cos(np.radians(self.alpha)))
+        V = np.full_like(Y, self.velocity * np.sin(np.radians(self.alpha)))
+        for x, y, g in zip(x_all, y_all, gamma_split):
+            for i in range(grid_size):
+                for j in range(grid_size):
+                    u_induced, v_induced = self.induced_velocity(X[i, j], Y[i, j], x, y, g)
+                    U[i, j] += u_induced
+                    V[i, j] += v_induced
+        plt.figure(figsize=(10, 6))
+        for x, y in zip(x_all, y_all):
+            plt.plot(x, y, color='black', linewidth=2)
+        plt.streamplot(X, Y, U, V, color=np.sqrt(U**2 + V**2), linewidth=1.5, cmap='viridis')
+        plt.colorbar(label='Velocity Magnitude')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.title('Streamlines Around the Airfoils')
+        plt.axis('equal')
+        plt.grid()
+        plt.show()
+
+
+
+# Example Usage
+if __name__ == "__main__":
+    # Example airfoil geometries
+    x1 = np.linspace(0, 1, 50)
+    y1 = 0.1 * (0.2969 * np.sqrt(x1) - 0.126 * x1 - 0.3516 * x1**2 + 0.2843 * x1**3 - 0.1015 * x1**4)
+    x2 = np.linspace(0, 1, 50)
+    y2 = 0.08 * (0.2969 * np.sqrt(x2) - 0.126 * x2 - 0.3516 * x2**2 + 0.2843 * x2**3 - 0.1015 * x2**4) - 0.2
+
+    # Combine airfoils
+    x_all = [x1, x2]
+    y_all = [y1, y2]
+
+    # Initialize and run vortex panel method
+    vpm = VortexPannelMethod(chord=1.0, velocity=1.0, alpha=5.0)
+    gamma_split = vpm.run(x_all, y_all)
+
+    # Plot streamlines
+    vpm.plot_streamlines(x_all, y_all, gamma_split)
+

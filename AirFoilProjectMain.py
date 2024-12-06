@@ -439,10 +439,17 @@ class Main:
 		self.NACA = airfoil_geometry['element0']['NACA']
 		self.xcos = airfoil_geometry['element0']['xcos']
 		self.yc = airfoil_geometry['element0']['yc']
-		# self.setup_vortex_pannel_method(alpha)
-		# self.load_flow_field(alpha)
-		# CL, Cmle, Cmc4, x_cp, y_cp, self.gamma = self.pannelmethod.run(self.x_geo, self.y_geo)
-		# self.plot_streamlines(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
+
+		xall = [airfoil_geometry['element0']['x']]
+		yall = [airfoil_geometry['element0']['y']]
+		
+		vpm = VortexPannelMethod(1.0, self.free_stream_velocity, alpha)
+		self.gamma = vpm.run(xall, yall)
+		
+		self.flow = Flow.Flow(self.free_stream_velocity, alpha, self.x_low_val, self.x_up_val, vpm)
+		self.plot_streamlines(self.x_start, self.x_low_val, self.x_up_val, self.delta_s, self.n_lines, self.delta_y)
+
+		
 
 
 if __name__ == "__main__":

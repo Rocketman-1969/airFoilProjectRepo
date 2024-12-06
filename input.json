@@ -12,7 +12,7 @@
         "1" : {
             "airfoil" : "2412",
             "trailing_edge" : "closed",
-            "n_points" : 200,
+            "n_points" : 10,
             "Leading_edge" : [0.0, 0.0],
             "chord_length" : 0.75,
             "mounting_angle[deg]" : 5.0,
@@ -21,7 +21,7 @@
         "2" : {
             "airfoil" : "2412",
             "trailing_edge" : "closed",
-            "n_points" : 200,
+            "n_points" : 10,
             "Leading_edge" : [-0.5, 1.0],
             "chord_length" : 1.0,
             "mounting_angle[deg]" : 0.0,
@@ -30,7 +30,7 @@
         "3" : {
             "airfoil" : "0012",
             "trailing_edge" : "closed",
-            "n_points" : 200,
+            "n_points" : 10,
             "Leading_edge" : [2.0, 0.5],
             "chord_length" : 0.25,
             "mounting_angle[deg]" : 5.0,
